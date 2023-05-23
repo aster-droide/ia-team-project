@@ -8,4 +8,5 @@
 
 
 Please create a branch off the `master` branch when working on the project
+
 Once changes are committed to your branch, create a pull request for review into `master`
