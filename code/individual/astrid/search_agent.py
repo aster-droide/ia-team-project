@@ -4,6 +4,9 @@ from datetime import datetime
 
 # TODO: INDIVIDUAL PROCESSING - THREADING?
 
+# NOTE: Change "q parameter below to change the search query
+
+
 class SearchAgent:
 
     # SerpApi personal API key to access the endpoint
