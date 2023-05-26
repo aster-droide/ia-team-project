@@ -57,7 +57,7 @@ class DataProcessingAgent:
 class DataExportAgent:
 
     @staticmethod
-    def export_data(processed_data, csv_file):
+    def export_data(processed_data):
 
         # get current date and time
         time = datetime.now()
@@ -94,9 +94,7 @@ def main():
 
     # export data as CSV
     data_export_agent = DataExportAgent()
-    data_export_agent.export_data(processed_data, "test1.s.csv")
-
-    # print(processed_data)
+    data_export_agent.export_data(processed_data)
 
 
 if __name__ == "__main__":
