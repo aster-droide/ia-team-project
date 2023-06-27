@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <link href="http://arxiv.org/api/query?search_query%3Dall%3Amachine%20learning%26id_list%3D%26start%3D0%26max_results%3D2" rel="self" type="application/atom+xml"/>
+  <title type="html">ArXiv Query: search_query=all:machine learning&amp;id_list=&amp;start=0&amp;max_results=2</title>
+  <id>http://arxiv.org/api/8xw5DtHrC6jdzWr/S+7l3RKB7mI</id>
+  <updated>2023-06-27T00:00:00-04:00</updated>
+  <opensearch:totalResults xmlns:opensearch="http://a9.com/-/spec/opensearch/1.1/">270543</opensearch:totalResults>
+  <opensearch:startIndex xmlns:opensearch="http://a9.com/-/spec/opensearch/1.1/">0</opensearch:startIndex>
+  <opensearch:itemsPerPage xmlns:opensearch="http://a9.com/-/spec/opensearch/1.1/">2</opensearch:itemsPerPage>
+  <entry>
+    <id>http://arxiv.org/abs/1909.03550v1</id>
+    <updated>2019-09-08T21:49:42Z</updated>
+    <published>2019-09-08T21:49:42Z</published>
+    <title>Lecture Notes: Optimization for Machine Learning</title>
+    <summary>  Lecture notes on optimization for machine learning, derived from a course at
+Princeton University and tutorials given in MLSS, Buenos Aires, as well as
+Simons Foundation, Berkeley.
+</summary>
+    <author>
+      <name>Elad Hazan</name>
+    </author>
+    <link href="http://arxiv.org/abs/1909.03550v1" rel="alternate" type="text/html"/>
+    <link title="pdf" href="http://arxiv.org/pdf/1909.03550v1" rel="related" type="application/pdf"/>
+    <arxiv:primary_category xmlns:arxiv="http://arxiv.org/schemas/atom" term="cs.LG" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="cs.LG" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="stat.ML" scheme="http://arxiv.org/schemas/atom"/>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/1811.04422v1</id>
+    <updated>2018-11-11T14:28:34Z</updated>
+    <published>2018-11-11T14:28:34Z</published>
+    <title>An Optimal Control View of Adversarial Machine Learning</title>
+    <summary>  I describe an optimal control view of adversarial machine learning, where the
+dynamical system is the machine learner, the input are adversarial actions, and
+the control costs are defined by the adversary's goals to do harm and be hard
+to detect. This view encompasses many types of adversarial machine learning,
+including test-item attacks, training-data poisoning, and adversarial reward
+shaping. The view encourages adversarial machine learning researcher to utilize
+advances in control theory and reinforcement learning.
+</summary>
+    <author>
+      <name>Xiaojin Zhu</name>
+    </author>
+    <link href="http://arxiv.org/abs/1811.04422v1" rel="alternate" type="text/html"/>
+    <link title="pdf" href="http://arxiv.org/pdf/1811.04422v1" rel="related" type="application/pdf"/>
+    <arxiv:primary_category xmlns:arxiv="http://arxiv.org/schemas/atom" term="cs.LG" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="cs.LG" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="stat.ML" scheme="http://arxiv.org/schemas/atom"/>
+  </entry>
+</feed>
