@@ -11,10 +11,14 @@ from agents_code import SearchAgent, DataProcessingAgent, DataExportAgent
 
 win_width, win_height = 600, 400
 
-# todo: option for error log?
 # todo: add button to open CSV rather than opening automatically and print out path location
+#  I think it's better to just open the CSV since it's unpredictable which CSV will open when something has gone wrong
+#  with the search or the code, if we open the file automatically it will just be the file we're working in
+#  if nothing has been written for whatever reason i don't want the program to open a file
+
+
 # todo: checkboxes for APIs
-# todo: label box at top, select all or clear all
+
 # todo: add restrictions on UI level, will be easier for testing. We can assume the endpoints will have their error
 #  handling in place so we don't need to deal with that. Do put an "unexpected response" message when the APIs results
 #  are unexpected
@@ -24,7 +28,7 @@ logging.basicConfig(
     filename='app.log',
     level=logging.INFO,
     filemode='w',
-    format='%(asctime)s - %(levelname)s - %(message)s'
+    format='%(asctime)s - %(levelname)s - %(agent)s - %(message)s'
 )
 
 
@@ -117,9 +121,9 @@ class MainWin(QWidget):
         new_csv = self.new_csv_checkbox.isChecked()
         num_results = self.num_results_spinbox.value()
 
-        logging.info("SEARCH TERM: %s", search_term)
-        logging.info("NEW CSV: %s", new_csv)
-        logging.info("NUMBER OF DESIRED SEARCH RESULTS: %s", num_results)
+        logging.info("SEARCH TERM: %s", search_term, extra={"agent": "INFO"})
+        logging.info("NEW CSV: %s", new_csv, extra={"agent": "INFO"})
+        logging.info("NUMBER OF DESIRED SEARCH RESULTS: %s", num_results, extra={"agent": "INFO"})
 
         # call search method
         self.search(search_term, new_csv, num_results)
@@ -212,7 +216,7 @@ class MainWin(QWidget):
                 os.system(f'xdg-open {csv_file_path}')
 
         except Exception as e:
-            logging.error(f"An error occurred: {str(e)}")
+            logging.error(f"An error occurred: {str(e)}", extra={"agent": "ERROR"})
 
 
 if __name__ == "__main__":
