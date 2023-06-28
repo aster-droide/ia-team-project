@@ -1,4 +1,5 @@
 import requests
+import logging
 import csv
 import threading
 import xmltodict
@@ -10,6 +11,13 @@ import json
 import xml.etree.ElementTree as ET
 from datetime import datetime
 
+logging.basicConfig(
+    level=logging.INFO,
+    filename='app.log',
+    filemode='a',   # append to file created in `main_window.py`
+    format='%(asctime)s - %(levelname)s - %(message)s'
+)
+
 
 # todo: add assertation that a datatype is a certain datatype when extracting data, ie always a dict, list, str?
 #  depending on number of entries?
@@ -20,6 +28,8 @@ from datetime import datetime
 # todo: chosen to go for direct database link rather than DOI as DOI is not available for all results
 
 # todo: add stop button in UI in case one of the queues doesn't close
+
+# todo: append to existing file seems to always append to csv numbered 9 for some reason
 
 
 class SearchAgent:
@@ -46,24 +56,25 @@ class SearchAgent:
         retry_delay = 1
 
         for _ in range(max_retries):
-            print("TRYING ARXIV")
+            logging.info("TRYING ARXIV")
 
             try:
                 response = requests.get(url, params=params)
 
                 # return output with source identifier
-                return 'arxiv', response.text
+                logging.info("arXiv response received as expected, sending to processing queue")
+                return 'arXiv', response.text
 
             # handle generic exception since various API side errors were thrown during development
             except Exception as e:
-                print(f"Request error occurred: {str(e)}")
-                print("Retrying...")
+                logging.warning(f"Request error occurred for arXiv: {str(e)}")
+                logging.info("Retrying...")
                 time.sleep(retry_delay)
 
         # if all retries fail, return an empty XML string so that the processing agent can deal with this
         # todo: return this message to the UI
-        print("Failed to retrieve data from arXiv API")
-        return 'arxiv', "<?xml version='1.0' encoding='UTF-8'?><root></root>"
+        logging.error("Failed to retrieve data from arXiv API, see exception logs above")
+        return 'arXiv', "<?xml version='1.0' encoding='UTF-8'?><root></root>"
 
     @staticmethod
     def search_pubmed(search_term, max_results):
@@ -80,7 +91,7 @@ class SearchAgent:
         retry_delay = 1
 
         for _ in range(max_retries):
-            print("TRYING PUBMED")
+            logging.info("TRYING PUBMED")
             try:
 
                 response = requests.get(url, params=params)
@@ -95,10 +106,9 @@ class SearchAgent:
                 # id list as string
                 id_list = ",".join(article_ids)
 
-                print(id_list)
+                logging.info("PubMed records requested Id list: %s", id_list)
 
                 try:
-
                     # pass the list of Ids from the above request to the EFetch API to retrieve research records,
                     # retrieved with xml for processing
                     url = f"https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=pubmed&id={id_list}&retmode=xml"
@@ -107,51 +117,56 @@ class SearchAgent:
                     response.raise_for_status()
 
                     # return output with source identifier
-                    return 'pubmed', response.text
+                    logging.info("PubMed response received as expected, sending to processing queue")
+                    return 'PubMed', response.text
 
                 # handle generic exception since various API side errors were thrown during development
                 except Exception as e:
-                    print(f"Request error occurred: {str(e)}")
-                    print("Retrying...")
+                    logging.warning(f"Request error occurred for PubMed efetch API: {str(e)}")
+                    logging.info("Retrying...")
                     time.sleep(retry_delay)
                     continue
 
             # handle generic exception since various API side errors were thrown during development
             except Exception as e:
-                print(f"Request error occurred: {str(e)}")
-                print("Retrying...")
+                logging.warning(f"Request error occurred for PubMed esearch API: {str(e)}")
+                logging.info("Retrying...")
                 time.sleep(retry_delay)
                 continue
 
         # if all retries fail, return an empty XML string so that the processing agent can deal with this
         # todo: return this message to the UI
-        print("Failed to retrieve data from PubMed API")
-        return 'pubmed', "<?xml version='1.0' encoding='UTF-8'?><root></root>"
+        logging.error("Failed to retrieve data from PubMed API, see exception logs above")
+        return 'PubMed', "<?xml version='1.0' encoding='UTF-8'?><root></root>"
 
     def search_ieee_xplore(self, search_term):
         pass
 
-    def search(self, search_queue, search_term, max_results):
+    def search(self, processing_queue, search_term, max_results):
+        # todo display statement on UI + statements for processing and exporting
         print("Starting search...")
         arxiv_results = self.search_arxiv(search_term, max_results)
-        search_queue.put(arxiv_results)
+        processing_queue.put(arxiv_results)
 
-        print("1 second pause for demonstration")
-        time.sleep(1)
+        # display statement on UI
+        # print("1 second pause in between search for demonstration")
+        # time.sleep(1)
 
         print("now for the second search..")
         pubmed_results = self.search_pubmed(search_term, max_results)
-        search_queue.put(pubmed_results)
+        processing_queue.put(pubmed_results)
 
         print("search done.")
         # put None to indicate end of search (sentinel value)
-        search_queue.put(None)
+        processing_queue.put(None)
 
 
 class DataProcessingAgent:
 
     @staticmethod
     def process_arxiv(arxiv_results):
+
+        logging.info("Starting arXiv processing...")
 
         processed_data = []
 
@@ -168,14 +183,14 @@ class DataProcessingAgent:
             except KeyError as e:
                 # if `entry` is missing from `feed` then there are no search results
                 if str(e) == "'entry'":
-                    print(f"No search results from arXiv")
+                    logging.warning(f"No search results from arXiv")
                 # print other KeyError
                 else:
-                    print(f"Unexpected response from arXiv, KeyError {e}")
+                    logging.error(f"Unexpected response from arXiv, KeyError {e}")
                 entries = []
         else:
-            # todo: return this error to the UI
-            print("Empty response from arXiv")
+            # todo: return this error to the UI ?
+            logging.warning("Empty response from arXiv")
             entries = []
 
         # single entry is returned as dict, convert to list
@@ -203,10 +218,13 @@ class DataProcessingAgent:
             # add row to processed data list
             processed_data.append(row)
 
-        return processed_data
+        logging.info("arXiv processing finished")
+        return 'arXiv', processed_data
 
     @staticmethod
     def process_pubmed(pubmed_results):
+
+        logging.info("Starting PubMed processing...")
 
         processed_data = []
 
@@ -220,13 +238,13 @@ class DataProcessingAgent:
         if dict_data:
             try:
                 entries = dict_data['PubmedArticleSet']['PubmedArticle']
-            # todo: return this error to the UI
+            # todo: return this error to the UI ?
             except KeyError as e:
-                print(f"Unexpected response from pubmed KeyError: {e}. Response: {dict_data}")
+                logging.error(f"Unexpected response from pubmed KeyError: {e}. Response: {dict_data}")
                 entries = []
         else:
-            # todo: return this error to the UI
-            print("Empty response from pubmed")
+            # todo: return this error to the UI ?
+            logging.warning("Empty response from pubmed")
             entries = []
 
         # single entry is returned as dict, convert to list
@@ -245,6 +263,8 @@ class DataProcessingAgent:
 
             author_names = [author['LastName'] + ' ' + author['ForeName'] for author in authors]
 
+            # todo: handle the case where `article['Abstract']['AbstractText']` for example doesn't exist
+            #  search term "blueberry pie" 3 results
             # dictionary for each row
             row = {
                 'title': article['ArticleTitle'],
@@ -256,46 +276,39 @@ class DataProcessingAgent:
             # add row to processed data list
             processed_data.append(row)
 
-        return processed_data
+        logging.info("PubMed processing finished")
+        return 'PubMed', processed_data
 
     def process_data(self, queue_in, queue_out):
 
         # always
         while True:
             try:
-                search_results = queue_in.get(timeout=1)
+                search_result_entry = queue_in.get(timeout=1)
 
                 # break loop if sentinel is received
-                if search_results is None:
-                    print("IT IS NONE")
+                if search_result_entry is None:
+                    logging.info("search_results == None, sentinel received loop will be broken")
                     break
 
-                print("....")
-                print("....")
-                print("SEARCH RESULTS: ", search_results)
-                print("....")
-                print("....")
+                logging.info("search_results can be added to logs here if desired (can clog logs with large requests)")
 
-                identifier, response_data = search_results
-
-                print("SEARCH RESULTS SPLIT: ", identifier, response_data)
+                identifier, response_data = search_result_entry
 
                 # Determine which API the data came from based on the identifier
                 # if arxiv
-                if identifier == 'arxiv':
-                    print("YES IT IS ARXIV")
+                if identifier == 'arXiv':
+                    logging.info("PROCESS IDENTIFIER is arXiv")
                     processed_data = self.process_arxiv(response_data)
-                    print("ARXIV PROCESSED:", processed_data)
 
                 # elif pubmed
-                elif identifier == 'pubmed':
-                    print("YES IT IS PUBMED")
+                elif identifier == 'PubMed':
+                    logging.info("PROCESS IDENTIFIER is PubMed")
                     processed_data = self.process_pubmed(response_data)
-                    print("PUBMED PROCESSED:", processed_data)
 
                 else:
                     # todo: feed back to UI
-                    print("Unrecognised response:", search_results)
+                    logging.error("Unrecognised response: %s", search_result_entry)
                     # go to next iteration if response not recognised
                     continue
 
@@ -306,7 +319,7 @@ class DataProcessingAgent:
                 queue_out.put(processed_data)
 
             except queue.Empty:
-                print("Queue is empty, waiting...")
+                logging.info("Search result queue is empty, waiting...")
                 time.sleep(1)
 
         # Add sentinel to output queue when finished
@@ -321,11 +334,21 @@ class DataExportAgent:
         while True:
             try:
                 # get queue entry
-                processed_data = queue_out.get(timeout=1)
+                processed_result_entry = queue_out.get(timeout=1)
+
+                # demonstration
+                # print("5 second pause for demonstration")
+                # logging.info("5 second pause in `export_data` function for demonstration")
+                # time.sleep(5)
 
                 # break loop if sentinel is received
-                if processed_data is None:
+                if processed_result_entry is None:
                     break
+
+                # source identifier for logs
+                identifier, processed_data = processed_result_entry
+
+                logging.info(f"Exporting processed {identifier} data to CSV...")
 
                 # Check if file exists
                 file_exists = os.path.isfile(location)
@@ -353,15 +376,14 @@ class DataExportAgent:
                     for row in processed_data:
                         writer.writerow(row)
 
+                    logging.info(f"Processed {identifier} data has been written to CSV at location {location}")
+
             except queue.Empty:
-                print("Export queue is empty, waiting...")
+                logging.info("Export queue is empty, waiting...")
                 time.sleep(1)
 
 
 def main():
-    # create event to signal termination in case of errors
-    terminate_event = threading.Event()
-
     # create queues
     queue_in = queue.Queue()
     queue_out = queue.Queue()
