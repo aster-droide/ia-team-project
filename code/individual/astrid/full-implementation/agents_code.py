@@ -10,6 +10,7 @@ import platform
 import json
 import xml.etree.ElementTree as ET
 from datetime import datetime
+from PyQt5.QtCore import QObject, pyqtSignal
 
 logging.basicConfig(
     level=logging.INFO,
@@ -31,6 +32,17 @@ logging.basicConfig(
 
 # todo: append to existing file seems to always append to csv numbered 9 for some reason
 
+# create signal instance to communicate with the UI
+class AgentSignals(QObject):
+    no_result_arxiv = pyqtSignal(str)
+    no_result_pubmed = pyqtSignal(str)
+    error_arxiv = pyqtSignal(str)
+    error_pubmed = pyqtSignal(str)
+    general_error = pyqtSignal(str)
+    success = pyqtSignal(str)
+
+
+agent_signals = AgentSignals()
 
 class SearchAgent:
 
@@ -75,6 +87,7 @@ class SearchAgent:
 
         # if all retries fail, return an empty XML string so that the processing agent can deal with this
         # todo: return this message to the UI
+        agent_signals.error_arxiv.emit("Failed to retrieve data from arXiv API, review app.logs for more info")
         logging.error("Failed to retrieve data from arXiv API, see exception logs above", extra={"agent": "SEARCH AGENT"})
         return 'arXiv', "<?xml version='1.0' encoding='UTF-8'?><root></root>"
 
@@ -144,6 +157,7 @@ class SearchAgent:
 
         # if all retries fail, return an empty XML string so that the processing agent can deal with this
         # todo: return this message to the UI
+        agent_signals.error_pubmed.emit("Failed to retrieve data from PubMed API, review app.logs for more info")
         logging.error("Failed to retrieve data from PubMed API, see exception logs above", extra={"agent": "SEARCH AGENT"})
         return 'PubMed', "<?xml version='1.0' encoding='UTF-8'?><root></root>"
 
@@ -195,13 +209,19 @@ class DataProcessingAgent:
                 # if `entry` is missing from `feed` then there are no search results
                 if str(e) == "'entry'":
                     logging.warning(f"No search result for this search term for arXiv", extra={"agent": "PROCESSING AGENT"})
+                    # pass message to UI
+                    agent_signals.no_result_arxiv.emit("No search results for this search term for arXiv")
                     return 'arXiv', 'No search result for this search term'
                 # print other KeyError
                 else:
+                    agent_signals.error_arxiv.emit("Unexpected response from arXiv, review app.logs for more info")
                     logging.error(f"Unexpected response from arXiv, KeyError {e}", extra={"agent": "PROCESSING AGENT"})
                 entries = []
         else:
             # todo: return this error to the UI ?
+            # this should never be hit because the search agent returns an empty xml for "processing" so
+            # `dict_data` should never be empty, however putting this here just in case
+            agent_signals.error_arxiv.emit("Unexpected response from arXiv, review app.logs for more info")
             logging.warning("Empty response from arXiv", extra={"agent": "PROCESSING AGENT"})
             entries = []
 
@@ -244,6 +264,7 @@ class DataProcessingAgent:
         # log if no search results presents
         if pubmed_results == 'No search result for this search term':
             logging.warning('No search result for this search term for PubMed', extra={"agent": "PROCESSING AGENT"})
+            agent_signals.no_result_pubmed.emit("No search results for this search term for PubMed")
             return 'PubMed', pubmed_results
 
         else:
@@ -267,6 +288,7 @@ class DataProcessingAgent:
                     entries = dict_data['PubmedArticleSet']['PubmedArticle']
                 # todo: return this error to the UI ?
                 except KeyError as e:
+                    agent_signals.error_pubmed.emit("Unexpected response from PubMed, review app.logs for more info")
                     logging.error(f"Unexpected response from pubmed KeyError: {e}. Response: {dict_data}", extra={"agent": "PROCESSING AGENT"})
                     entries = []
             else:
@@ -360,7 +382,8 @@ class DataProcessingAgent:
 
                 else:
                     # todo: feed back to UI
-                    logging.error("Unrecognised response: %s", search_result_entry, extra={"agent": "PROCESSING AGENT"})
+                    agent_signals.general_error.emit("Unrecognised API response, review app.logs for more info")
+                    logging.error("Unrecognised API response: %s", search_result_entry, extra={"agent": "PROCESSING AGENT"})
                     # go to next iteration if response not recognised
                     continue
 
@@ -381,6 +404,30 @@ class DataProcessingAgent:
 class DataExportAgent:
     @staticmethod
     def export_data(queue_out, location, search_term):
+
+        # Check if file exists
+        file_exists = os.path.isfile(location)
+        # always create CSV regardless of whether there are no results
+        # this will return an empty CSV with the search term for reference
+        with open(location, 'a', newline='', encoding='utf-8') as export_file:
+
+            # todo: modify these headers appropriately (considering multiple and different API results)
+            # set CSV columns
+            columns = ['title', 'summary/abstract', 'author_names', 'url']
+            writer = csv.DictWriter(export_file, fieldnames=columns)
+
+            # todo: make sure CSV still creates when there are no search results or message to UI that there
+            #  are no results and thus no CSV has been created
+            # file does not exist or is empty write header row
+            if not file_exists or export_file.tell() == 0:
+                # present search term at top of CSV in capitals for clarity
+                # todo: add search terms here for later searches
+                search_term_row = {'title': 'SEARCH TERM:', 'summary/abstract': search_term.upper()}
+                writer.writerow(search_term_row)
+                # empty row for clarity
+                writer.writerow({})
+                # header row
+                writer.writeheader()
 
         # always
         while True:
@@ -406,30 +453,9 @@ class DataExportAgent:
                 else:
                     logging.info(f"Exporting processed {identifier} data to CSV...", extra={"agent": "EXPORT AGENT"})
 
-                # Check if file exists
-                file_exists = os.path.isfile(location)
-
                 with open(location, 'a', newline='', encoding='utf-8') as export_file:
-
-                    # todo: modify these headers appropriately (considering multiple and different API results)
-                    # set CSV columns
-                    columns = ['title', 'summary/abstract', 'author_names', 'url']
                     writer = csv.DictWriter(export_file, fieldnames=columns)
 
-                    # todo: make sure CSV still creates when there are no search results or message to UI that there
-                    #  are no results and thus no CSV has been created
-                    # file does not exist or is empty write header row
-                    if not file_exists or export_file.tell() == 0:
-                        # present search term at top of CSV in capitals for clarity
-                        # todo: add search terms here for later searches
-                        search_term_row = {'title': 'SEARCH TERM:', 'summary/abstract': search_term.upper()}
-                        writer.writerow(search_term_row)
-                        # empty row for clarity
-                        writer.writerow({})
-                        # header row
-                        writer.writeheader()
-
-                    # todo add exception for if processed fields not in csv columns `fieldnames`
                     # write rows to CSV
                     for row in processed_data:
                         writer.writerow(row)
@@ -439,6 +465,8 @@ class DataExportAgent:
             except queue.Empty:
                 logging.info("Export queue is empty, waiting...", extra={"agent": "EXPORT AGENT"})
                 time.sleep(1)
+
+        agent_signals.success.emit("Search, process, and export agents finished - CSV will be opened")
 
 
 def main():

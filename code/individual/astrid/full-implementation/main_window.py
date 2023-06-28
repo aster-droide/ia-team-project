@@ -7,7 +7,7 @@ import logging
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QVBoxLayout, QHBoxLayout, QLineEdit, QPushButton, QCheckBox, \
     QSpinBox
-from agents_code import SearchAgent, DataProcessingAgent, DataExportAgent
+from agents_code import agent_signals, SearchAgent, DataProcessingAgent, DataExportAgent
 
 win_width, win_height = 600, 400
 
@@ -15,7 +15,6 @@ win_width, win_height = 600, 400
 #  I think it's better to just open the CSV since it's unpredictable which CSV will open when something has gone wrong
 #  with the search or the code, if we open the file automatically it will just be the file we're working in
 #  if nothing has been written for whatever reason i don't want the program to open a file
-
 
 # todo: checkboxes for APIs
 
@@ -93,10 +92,34 @@ class MainWin(QWidget):
         input_layout.addWidget(self.search_term)
         input_layout.addWidget(self.submit_button)
 
+        # QLabels for info messaging
+        self.no_result_arxiv = QLabel(self)
+        self.no_result_arxiv.setStyleSheet("color: red")
+        self.no_result_pubmed = QLabel(self)
+        self.no_result_pubmed.setStyleSheet("color: red")
+        self.error_arxiv = QLabel(self)
+        self.error_arxiv.setStyleSheet("color: red")
+        self.error_pubmed = QLabel(self)
+        self.error_pubmed.setStyleSheet("color: red")
+        self.general_error = QLabel(self)
+        self.general_error.setStyleSheet("color: red")
+        self.success = QLabel(self)
+        self.success.setStyleSheet("color: blue")
+
+        # another vertical layout for info messages
+        vertical_info_layout = QVBoxLayout()
+        vertical_info_layout.addWidget(self.no_result_arxiv)
+        vertical_info_layout.addWidget(self.no_result_pubmed)
+        vertical_info_layout.addWidget(self.error_arxiv)
+        vertical_info_layout.addWidget(self.error_pubmed)
+        vertical_info_layout.addWidget(self.general_error)
+        vertical_info_layout.addWidget(self.success)
+
         # Add layouts to the main layout
         main_layout = QVBoxLayout()
         main_layout.addLayout(vertical_layout)
         main_layout.addLayout(input_layout)
+        main_layout.addLayout(vertical_info_layout)
 
         # Set the layout for the widget
         self.setLayout(main_layout)
@@ -105,6 +128,32 @@ class MainWin(QWidget):
         # self.checkbox_arxiv.stateChanged.connect(self.handle_checkbox_state)
         # self.checkbox_pubmed.stateChanged.connect(self.handle_checkbox_state)
         # self.checkbox_ieee.stateChanged.connect(self.handle_checkbox_state)
+
+        # handle agent signals
+        agent_signals.no_result_arxiv.connect(self.handle_no_result_arxiv)
+        agent_signals.no_result_pubmed.connect(self.handle_no_result_pubmed)
+        agent_signals.error_arxiv.connect(self.handle_error_arxiv)
+        agent_signals.error_pubmed.connect(self.handle_error_pubmed)
+        agent_signals.general_error.connect(self.handle_general_error)
+        agent_signals.success.connect(self.handle_success)
+
+    def handle_no_result_arxiv(self, message):
+        self.no_result_arxiv.setText(message)
+
+    def handle_no_result_pubmed(self, message):
+        self.no_result_pubmed.setText(message)
+
+    def handle_error_arxiv(self, message):
+        self.error_arxiv.setText(message)
+
+    def handle_error_pubmed(self, message):
+        self.error_pubmed.setText(message)
+
+    def handle_general_error(self, message):
+        self.general_error.setText(message)
+
+    def handle_success(self, message):
+        self.success.setText(message)
 
     def handle_select_all(self, state):
         # get state of "Select All" checkbox
@@ -201,7 +250,7 @@ class MainWin(QWidget):
             csv_file_path = os.path.join(
                 '/Users/astrid/PycharmProjects/ia-team-project/code/individual/astrid/csv-exports', f'{file_name}.csv')
 
-            # todo: if file was not created and thus doesn't exist, handle this and feed back to UI
+            # todo: if file was not created for whatever reason and thus doesn't exist, handle this and feed back to UI
             # open with default file extension app
             # on windows
             if platform.system() == 'Windows':
