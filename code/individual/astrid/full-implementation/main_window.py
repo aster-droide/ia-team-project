@@ -12,6 +12,8 @@ from agents_code import agent_signals, SearchAgent, DataProcessingAgent, DataExp
 
 win_width, win_height = 800, 600
 
+# todo: add character limit
+
 # todo: instead of adding a button to open CSV rather than opening automatically and print out path location
 #  I think it's better to just open the CSV since it's unpredictable which CSV will open when something has gone wrong
 #  with the search or the code, if we open the file automatically it will just be the file we're working in
@@ -59,7 +61,9 @@ class MainWin(QWidget):
         self.search_number_label = QLabel("Enter desired number of results (1-50):")
 
         # checkbox for new CSV or not
-        self.new_csv_checkbox = QCheckBox("Tick to create new CSV / leave un-ticked to append to latest existing")
+        self.new_csv_checkbox = QCheckBox("Tick to create new CSV / leave un-ticked to append to "
+                                          "existing file with highest counter (latest unless files have been deleted "
+                                          "in between and their places have been filled)")
 
         # create a QSpinBox widget for number of search results, designed for user integer input with arrows
         # QSpinBox deals with min-max values so users are forced to select a range of 1-50
@@ -71,6 +75,8 @@ class MainWin(QWidget):
 
         # QLineEdit for user input
         self.search_term = QLineEdit()
+        # set character limit of 255
+        self.search_term.setMaxLength(255)
 
         # QPushButton for submitting the input
         self.submit_button = QPushButton("Submit")
@@ -261,7 +267,7 @@ class MainWin(QWidget):
 
         if new_csv:
             # find highest counter number for existing file names
-            counter = 1
+            counter = 0
             while os.path.exists(os.path.join(base_dir, f"{file_name}-{counter}.csv")):
                 counter += 1
 
@@ -273,15 +279,18 @@ class MainWin(QWidget):
 
             if existing_files:
 
+                # use regex to find files matching our file_name pattern
                 existing_files = [file for file in os.listdir(base_dir) if re.match(rf"{file_name}-\d+\.csv$", file)]
+                # extract counters
                 existing_counters = [int(re.search(rf"{file_name}-(\d+)\.csv$", file).group(1)) for file in
                                      existing_files]
+                # find highest counter
                 highest_counter = max(existing_counters) if existing_counters else 0
                 file_name = f"{file_name}-{highest_counter}"
 
             else:
                 # base name if no file exists
-                counter = 1
+                counter = 0
                 file_name = f"{file_name}-{counter}"
 
         # Construct the absolute file path
