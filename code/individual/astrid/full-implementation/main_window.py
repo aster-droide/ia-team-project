@@ -1,17 +1,18 @@
 import threading
 import queue
 import os
+import re
 import platform
 import sys
 import logging
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QVBoxLayout, QHBoxLayout, QLineEdit, QPushButton, QCheckBox, \
-    QSpinBox
+    QSpinBox, QScrollArea
 from agents_code import agent_signals, SearchAgent, DataProcessingAgent, DataExportAgent
 
-win_width, win_height = 600, 400
+win_width, win_height = 800, 600
 
-# todo: add button to open CSV rather than opening automatically and print out path location
+# todo: instead of adding a button to open CSV rather than opening automatically and print out path location
 #  I think it's better to just open the CSV since it's unpredictable which CSV will open when something has gone wrong
 #  with the search or the code, if we open the file automatically it will just be the file we're working in
 #  if nothing has been written for whatever reason i don't want the program to open a file
@@ -21,6 +22,7 @@ win_width, win_height = 600, 400
 # todo: add restrictions on UI level, will be easier for testing. We can assume the endpoints will have their error
 #  handling in place so we don't need to deal with that. Do put an "unexpected response" message when the APIs results
 #  are unexpected
+
 
 # Set up logging to a file
 logging.basicConfig(
@@ -105,15 +107,35 @@ class MainWin(QWidget):
         self.general_error.setStyleSheet("color: red")
         self.success = QLabel(self)
         self.success.setStyleSheet("color: blue")
+        self.finished = QLabel(self)
+        self.finished.setStyleSheet("color: blue")
+
+        # create a scroll area and set the info QLabels as its widgets
+        self.scroll_area = QScrollArea()
+        self.scroll_area.setWidgetResizable(True)
+
+        # create QWidget to hold the info QLabels
+        info_widget = QWidget()
+        info_layout = QVBoxLayout()
+        info_layout.addWidget(self.no_result_arxiv)
+        info_layout.addWidget(self.no_result_pubmed)
+        info_layout.addWidget(self.error_arxiv)
+        info_layout.addWidget(self.error_pubmed)
+        info_layout.addWidget(self.general_error)
+        info_layout.addWidget(self.success)
+        info_layout.addWidget(self.finished)
+        info_widget.setLayout(info_layout)
 
         # another vertical layout for info messages
         vertical_info_layout = QVBoxLayout()
-        vertical_info_layout.addWidget(self.no_result_arxiv)
-        vertical_info_layout.addWidget(self.no_result_pubmed)
-        vertical_info_layout.addWidget(self.error_arxiv)
-        vertical_info_layout.addWidget(self.error_pubmed)
-        vertical_info_layout.addWidget(self.general_error)
-        vertical_info_layout.addWidget(self.success)
+        self.scroll_area.setWidget(info_widget)
+        vertical_info_layout.addWidget(self.scroll_area)
+        # vertical_info_layout.addWidget(self.no_result_pubmed)
+        # vertical_info_layout.addWidget(self.error_arxiv)
+        # vertical_info_layout.addWidget(self.error_pubmed)
+        # vertical_info_layout.addWidget(self.general_error)
+        # vertical_info_layout.addWidget(self.success)
+        # vertical_info_layout.addWidget(self.finished)
 
         # Add layouts to the main layout
         main_layout = QVBoxLayout()
@@ -139,21 +161,45 @@ class MainWin(QWidget):
 
     def handle_no_result_arxiv(self, message):
         self.no_result_arxiv.setText(message)
+        # resize scroll area to fit message content
+        self.scroll_area.updateGeometry()
+        self.scroll_area.verticalScrollBar().setValue(self.scroll_area.verticalScrollBar().maximum())
 
     def handle_no_result_pubmed(self, message):
         self.no_result_pubmed.setText(message)
+        # resize scroll area to fit message content
+        self.scroll_area.updateGeometry()
+        self.scroll_area.verticalScrollBar().setValue(self.scroll_area.verticalScrollBar().maximum())
 
     def handle_error_arxiv(self, message):
         self.error_arxiv.setText(message)
+        # resize scroll area to fit message content
+        self.scroll_area.updateGeometry()
+        self.scroll_area.verticalScrollBar().setValue(self.scroll_area.verticalScrollBar().maximum())
 
     def handle_error_pubmed(self, message):
         self.error_pubmed.setText(message)
+        # resize scroll area to fit message content
+        self.scroll_area.updateGeometry()
+        self.scroll_area.verticalScrollBar().setValue(self.scroll_area.verticalScrollBar().maximum())
 
     def handle_general_error(self, message):
         self.general_error.setText(message)
+        # resize scroll area to fit message content
+        self.scroll_area.updateGeometry()
+        self.scroll_area.verticalScrollBar().setValue(self.scroll_area.verticalScrollBar().maximum())
 
     def handle_success(self, message):
         self.success.setText(message)
+        # resize scroll area to fit message content
+        self.scroll_area.updateGeometry()
+        self.scroll_area.verticalScrollBar().setValue(self.scroll_area.verticalScrollBar().maximum())
+
+    def handle_finished(self, message):
+        self.finished.setText(message)
+        # resize scroll area to fit message content
+        self.scroll_area.updateGeometry()
+        self.scroll_area.verticalScrollBar().setValue(self.scroll_area.verticalScrollBar().maximum())
 
     def handle_select_all(self, state):
         # get state of "Select All" checkbox
@@ -164,7 +210,23 @@ class MainWin(QWidget):
         self.checkbox_pubmed.setChecked(checked)
         self.checkbox_ieee.setChecked(checked)
 
+    def clear_info_messages(self):
+        """method to clear info messages"""
+        self.no_result_arxiv.clear()
+        self.no_result_pubmed.clear()
+        self.error_arxiv.clear()
+        self.error_pubmed.clear()
+        self.general_error.clear()
+        self.success.clear()
+        self.finished.clear()
+
+        # Reset the scroll area position to the top
+        self.scroll_area.verticalScrollBar().setValue(0)
+
     def handle_submit(self):
+        # clear info message labels from previous search
+        self.clear_info_messages()
+
         # get search term from the user input field
         search_term = self.search_term.text()
         new_csv = self.new_csv_checkbox.isChecked()
@@ -194,30 +256,31 @@ class MainWin(QWidget):
         # set base file name
         file_name = "search-export"
 
-        # Set base directory
+        # set base directory
         base_dir = "/Users/astrid/PycharmProjects/ia-team-project/code/individual/astrid/csv-exports"
 
         if new_csv:
-            # Find the highest counter number for the file name
+            # find highest counter number for existing file names
             counter = 1
             while os.path.exists(os.path.join(base_dir, f"{file_name}-{counter}.csv")):
                 counter += 1
 
-            # Append the counter to the file name
+            # append counter to new file name
             file_name = f"{file_name}-{counter}"
         else:
-            # Find the latest existing file with the base file name
-            latest_file = max(
-                (file for file in os.listdir(base_dir) if file.startswith(file_name) and file.endswith(".csv")),
-                default=None,
-            )
+            # find existing files with the base file name
+            existing_files = [file for file in os.listdir(base_dir) if file.startswith(file_name) and file.endswith(".csv")]
 
-            # If an existing file is found, extract the counter number
-            if latest_file:
-                counter = int(latest_file[len(file_name) + 1:latest_file.index(".")])
-                file_name = f"{file_name}-{counter}"
+            if existing_files:
+
+                existing_files = [file for file in os.listdir(base_dir) if re.match(rf"{file_name}-\d+\.csv$", file)]
+                existing_counters = [int(re.search(rf"{file_name}-(\d+)\.csv$", file).group(1)) for file in
+                                     existing_files]
+                highest_counter = max(existing_counters) if existing_counters else 0
+                file_name = f"{file_name}-{highest_counter}"
+
             else:
-                # use base name if no file exists
+                # base name if no file exists
                 counter = 1
                 file_name = f"{file_name}-{counter}"
 
@@ -263,6 +326,9 @@ class MainWin(QWidget):
             # linux (linux doesn't run MS Excel)
             elif platform.system() == 'Linux':
                 os.system(f'xdg-open {csv_file_path}')
+
+            self.handle_finished("Search complete, CSV has been opened in default .csv extension application. "
+                                 f"<br>The file path is: {csv_file_path}")
 
         except Exception as e:
             logging.error(f"An error occurred: {str(e)}", extra={"agent": "ERROR"})

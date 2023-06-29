@@ -12,6 +12,8 @@ import xml.etree.ElementTree as ET
 from datetime import datetime
 from PyQt5.QtCore import QObject, pyqtSignal
 
+# todo: search for octopus with search nr 10 and you will get an `authorList` error for PubMed
+
 logging.basicConfig(
     level=logging.INFO,
     filename='app.log',
@@ -19,17 +21,15 @@ logging.basicConfig(
     format='%(asctime)s - %(levelname)s - %(agent)s - %(message)s'
 )
 
-
-# todo: add assertation that a datatype is a certain datatype when extracting data, ie always a dict, list, str?
-#  depending on number of entries?
-
+# NOTES
 # todo: arxiv and pubmed provide xml only, IEEE provides json but sticking with xml for consistency and then
 #  transforming locally
-
 # todo: chosen to go for direct database link rather than DOI as DOI is not available for all results
+# todo: excel has limitations - it's not recognising the encoding, there is a workaround through importing manually:
+#  https://stackoverflow.com/questions/6002256/is-it-possible-to-force-excel-recognize-utf-8-csv-files-automatically/6488070#6488070
+# NOTES
 
 # todo: add stop button in UI in case one of the queues doesn't close
-
 # todo: append to existing file seems to always append to csv numbered 9 for some reason
 
 # create signal instance to communicate with the UI
@@ -86,7 +86,6 @@ class SearchAgent:
                 time.sleep(retry_delay)
 
         # if all retries fail, return an empty XML string so that the processing agent can deal with this
-        # todo: return this message to the UI
         agent_signals.error_arxiv.emit("Failed to retrieve data from arXiv API, review app.logs for more info")
         logging.error("Failed to retrieve data from arXiv API, see exception logs above", extra={"agent": "SEARCH AGENT"})
         return 'arXiv', "<?xml version='1.0' encoding='UTF-8'?><root></root>"
@@ -156,7 +155,6 @@ class SearchAgent:
                 continue
 
         # if all retries fail, return an empty XML string so that the processing agent can deal with this
-        # todo: return this message to the UI
         agent_signals.error_pubmed.emit("Failed to retrieve data from PubMed API, review app.logs for more info")
         logging.error("Failed to retrieve data from PubMed API, see exception logs above", extra={"agent": "SEARCH AGENT"})
         return 'PubMed', "<?xml version='1.0' encoding='UTF-8'?><root></root>"
@@ -165,7 +163,6 @@ class SearchAgent:
         pass
 
     def search(self, processing_queue, search_term, max_results):
-        # todo display statement on UI + statements for processing and exporting
         print("Starting search...")
         arxiv_results = self.search_arxiv(search_term, max_results)
         processing_queue.put(arxiv_results)
@@ -204,7 +201,6 @@ class DataProcessingAgent:
         if dict_data:
             try:
                 entries = dict_data['feed']['entry']
-            # todo: return this error to the UI
             except KeyError as e:
                 # if `entry` is missing from `feed` then there are no search results
                 if str(e) == "'entry'":
@@ -218,7 +214,6 @@ class DataProcessingAgent:
                     logging.error(f"Unexpected response from arXiv, KeyError {e}", extra={"agent": "PROCESSING AGENT"})
                 entries = []
         else:
-            # todo: return this error to the UI ?
             # this should never be hit because the search agent returns an empty xml for "processing" so
             # `dict_data` should never be empty, however putting this here just in case
             agent_signals.error_arxiv.emit("Unexpected response from arXiv, review app.logs for more info")
@@ -238,8 +233,8 @@ class DataProcessingAgent:
             if not isinstance(authors, list):
                 authors = [authors]
 
-            # get author name with default 'Unknown' value if author is not present
-            author_names = [author.get('name', 'Unknown') for author in authors]
+            # get author name with default 'No authors listed' value if author is not present
+            author_names = [author.get('name', 'No authors listed') for author in authors]
 
             print(author_names)
 
@@ -286,13 +281,11 @@ class DataProcessingAgent:
             if dict_data:
                 try:
                     entries = dict_data['PubmedArticleSet']['PubmedArticle']
-                # todo: return this error to the UI ?
                 except KeyError as e:
                     agent_signals.error_pubmed.emit("Unexpected response from PubMed, review app.logs for more info")
                     logging.error(f"Unexpected response from pubmed KeyError: {e}. Response: {dict_data}", extra={"agent": "PROCESSING AGENT"})
                     entries = []
             else:
-                # todo: return this error to the UI ?
                 logging.warning("Empty response from pubmed", extra={"agent": "PROCESSING AGENT"})
                 entries = []
 
@@ -305,35 +298,44 @@ class DataProcessingAgent:
                 medline_citation = entry['MedlineCitation']
                 article = medline_citation['Article']
 
-                # todo: format author names, there are weird characters in it
+                print("article:", json.dumps(article, indent=4))
+
                 # PubMed citations may include collaborative group names, handling this case
                 # also handling single/multi authors, and handling the case where LastName OR ForeName is missing
                 author_names = []
 
-                # individual author names
-                if 'Author' in article['AuthorList']:
-                    authors = article['AuthorList']['Author']
+                # check if there are authors (https://pubmed.ncbi.nlm.nih.gov/37369842/ for example has no
+                # authors listed)
+                if 'AuthorList' in article:
+                    # individual author names
+                    if 'Author' in article['AuthorList']:
+                        authors = article['AuthorList']['Author']
+                        print("authors", authors)
 
-                    # handle single author as dictionary to list
-                    if isinstance(authors, dict):
-                        authors = [authors]
+                        # handle single author as dictionary to list
+                        if isinstance(authors, dict):
+                            authors = [authors]
 
-                    for author in authors:
-                        last_name = author.get('LastName')
-                        fore_name = author.get('ForeName')
+                        for author in authors:
+                            last_name = author.get('LastName')
+                            fore_name = author.get('ForeName')
 
-                        if last_name or fore_name:
-                            full_name = ' '.join(filter(None, [last_name, fore_name]))
-                            author_names.append(full_name)
+                            if last_name or fore_name:
+                                full_name = ' '.join(filter(None, [last_name, fore_name]))
+                                author_names.append(full_name)
 
-                # collective/group author
-                if 'CollectiveName' in article['AuthorList']:
-                    collective_name = article['AuthorList']['CollectiveName']
-                    author_names.append(collective_name)
+                    # collective/group author
+                    # checking conditions for both `CollectiveName` and `AuthorList` since an edge case might list both
+                    if 'CollectiveName' in article['AuthorList']:
+                        collective_name = article['AuthorList']['CollectiveName']
+                        author_names.append(collective_name)
 
-                # if no individual or collective author names are present, set author value to "Unknown"
-                if not author_names:
-                    author_names.append("Unknown")
+                    # if no individual or collective author names are present, set author value to "No authors listed"
+                    if not author_names:
+                        author_names.append("No authors listed")
+
+                else:
+                    author_names.append("No authors listed")
 
                 # dictionary for each row, check each entry and replace value with "No ... present" if value is missing
                 row = {
@@ -365,7 +367,7 @@ class DataProcessingAgent:
 
                 logging.info("search_results can be added to logs here if desired (can clog logs with large requests)", extra={"agent": "PROCESSING AGENT"})
 
-                print(search_result_entry)
+                # print(search_result_entry)
 
                 identifier, response_data = search_result_entry
 
@@ -381,7 +383,6 @@ class DataProcessingAgent:
                     processed_data = self.process_pubmed(response_data)
 
                 else:
-                    # todo: feed back to UI
                     agent_signals.general_error.emit("Unrecognised API response, review app.logs for more info")
                     logging.error("Unrecognised API response: %s", search_result_entry, extra={"agent": "PROCESSING AGENT"})
                     # go to next iteration if response not recognised
@@ -411,13 +412,10 @@ class DataExportAgent:
         # this will return an empty CSV with the search term for reference
         with open(location, 'a', newline='', encoding='utf-8') as export_file:
 
-            # todo: modify these headers appropriately (considering multiple and different API results)
             # set CSV columns
             columns = ['title', 'summary/abstract', 'author_names', 'url']
             writer = csv.DictWriter(export_file, fieldnames=columns)
 
-            # todo: make sure CSV still creates when there are no search results or message to UI that there
-            #  are no results and thus no CSV has been created
             # file does not exist or is empty write header row
             if not file_exists or export_file.tell() == 0:
                 # present search term at top of CSV in capitals for clarity
@@ -467,100 +465,3 @@ class DataExportAgent:
                 time.sleep(1)
 
         agent_signals.success.emit("Search, process, and export agents finished - CSV will be opened")
-
-
-def main():
-    # create queues
-    queue_in = queue.Queue()
-    queue_out = queue.Queue()
-
-    # create instances of agents
-    search_agent = SearchAgent()
-    data_processing_agent = DataProcessingAgent()
-    data_export_agent = DataExportAgent()
-
-    # set base file name
-    file_name = "search-export"
-
-    # Set base directory
-    base_dir = "/Users/astrid/PycharmProjects/ia-team-project/code/individual/astrid/csv-exports"
-
-    # todo: create button on UI for this, if button is clicked we will create a new file
-    # Check if the user wants to create a new CSV
-    new_csv = input("New CSV? True/False: ").lower() == "true"
-
-    if new_csv:
-        # Find the highest counter number for the file name
-        counter = 1
-        while os.path.exists(os.path.join(base_dir, f"{file_name}-{counter}.csv")):
-            counter += 1
-
-        # Append the counter to the file name
-        file_name = f"{file_name}-{counter}"
-    else:
-        # Find the latest existing file with the base file name
-        latest_file = max(
-            (file for file in os.listdir(base_dir) if file.startswith(file_name) and file.endswith(".csv")),
-            default=None,
-        )
-
-        # If an existing file is found, extract the counter number
-        if latest_file:
-            counter = int(latest_file[len(file_name) + 1:latest_file.index(".")])
-            file_name = f"{file_name}-{counter}"
-        else:
-            # use base name if no file exists
-            counter = 1
-            file_name = f"{file_name}-{counter}"
-
-    # Construct the absolute file path
-    location = os.path.join(base_dir, f"{file_name}.csv")
-
-    # get user input for search term
-    search_term = input("Enter search term: ")
-
-    # TODO: add user input for which apis to search here
-
-    try:
-
-        # Start the search thread
-        search_thread = threading.Thread(target=search_agent.search, args=(queue_in, search_term, 2))
-        search_thread.start()
-
-        # Start the processing thread
-        processing_thread = threading.Thread(target=data_processing_agent.process_data, args=(queue_in, queue_out,))
-        processing_thread.start()
-
-        # Start the export thread
-        export_thread = threading.Thread(target=data_export_agent.export_data, args=(queue_out, location, search_term,))
-        export_thread.start()
-
-        # wait for all threads to finish to ensure complete data
-        search_thread.join()
-        processing_thread.join()
-        export_thread.join()
-
-        # Construct the absolute path to the CSV file
-        csv_file_path = os.path.join('/Users/astrid/PycharmProjects/ia-team-project/code/individual/astrid/csv-exports',
-                                     f'{file_name}.csv')
-
-        # todo: if file was not created and thus doesn't exist, handle this and feed back to UI
-        # open in MS Excel
-        # on windows
-        if platform.system() == 'Windows':
-            os.system(f'start excel.exe {csv_file_path}')
-
-        # on macOS
-        elif platform.system() == 'Darwin':
-            os.system(f'open {csv_file_path}')
-
-        # linux (linux doesn't run MS Excel)
-        elif platform.system() == 'Linux':
-            os.system(f'xdg-open {csv_file_path}')
-
-    except Exception as e:
-        print(f"An error occurred: {str(e)}")
-
-
-if __name__ == "__main__":
-    main()
