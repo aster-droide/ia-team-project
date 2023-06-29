@@ -224,7 +224,6 @@ class DataProcessingAgent:
         if not isinstance(entries, list):
             entries = [entries]
 
-        # todo: handle encoded titles?
         # check each search result entry
         for entry in entries:
 

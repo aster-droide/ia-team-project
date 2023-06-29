@@ -12,8 +12,6 @@ from agents_code import agent_signals, SearchAgent, DataProcessingAgent, DataExp
 
 win_width, win_height = 800, 600
 
-# todo: add character limit
-
 # todo: instead of adding a button to open CSV rather than opening automatically and print out path location
 #  I think it's better to just open the CSV since it's unpredictable which CSV will open when something has gone wrong
 #  with the search or the code, if we open the file automatically it will just be the file we're working in
