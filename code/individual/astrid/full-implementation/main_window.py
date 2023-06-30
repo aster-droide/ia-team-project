@@ -5,6 +5,7 @@ import re
 import platform
 import sys
 import logging
+import multiprocessing
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QVBoxLayout, QHBoxLayout, QLineEdit, QPushButton, QCheckBox, \
     QSpinBox, QScrollArea
@@ -17,11 +18,15 @@ win_width, win_height = 800, 600
 #  with the search or the code, if we open the file automatically it will just be the file we're working in
 #  if nothing has been written for whatever reason i don't want the program to open a file
 
+# todo: when nothing is selected, error on the UI / don't allow it (grey out submit?) also for search phrase?
+
 # todo: checkboxes for APIs
 
 # todo: add restrictions on UI level, will be easier for testing. We can assume the endpoints will have their error
 #  handling in place so we don't need to deal with that. Do put an "unexpected response" message when the APIs results
 #  are unexpected
+
+# todo: add our names in corner of UI
 
 
 # Set up logging to a file
@@ -249,8 +254,9 @@ class MainWin(QWidget):
     def search(self, search_term, new_csv, num_results):
 
         # create queues
-        queue_in = queue.Queue()
-        queue_out = queue.Queue()
+        search_in_queue = multiprocessing.Queue()
+        processing_queue = multiprocessing.Queue()
+        queue_out = multiprocessing.Queue()
 
         # create instances of agents
         search_agent = SearchAgent()
@@ -294,20 +300,23 @@ class MainWin(QWidget):
         # Construct the absolute file path
         location = os.path.join(base_dir, f"{file_name}.csv")
 
+        # Add the search term to the input queue
+        search_in_queue.put(search_term)
+
         # TODO: add user input for which apis to search here
 
         try:
 
             # Start the search thread
-            search_thread = threading.Thread(target=search_agent.search, args=(queue_in, search_term, num_results))
+            search_thread = multiprocessing.Process(target=search_agent.search, args=(search_in_queue, processing_queue, num_results))
             search_thread.start()
 
             # Start the processing thread
-            processing_thread = threading.Thread(target=data_processing_agent.process_data, args=(queue_in, queue_out,))
+            processing_thread = multiprocessing.Process(target=data_processing_agent.process_data, args=(processing_queue, queue_out,))
             processing_thread.start()
 
             # Start the export thread
-            export_thread = threading.Thread(target=data_export_agent.export_data,
+            export_thread = multiprocessing.Process(target=data_export_agent.export_data,
                                              args=(queue_out, location, search_term,))
             export_thread.start()
 
@@ -338,6 +347,7 @@ class MainWin(QWidget):
                                  f"<br>The file path is: {csv_file_path}")
 
         except Exception as e:
+            # todo: add UI message for this
             logging.error(f"An error occurred: {str(e)}", extra={"agent": "ERROR"})
 
 

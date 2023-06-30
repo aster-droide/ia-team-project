@@ -5,9 +5,11 @@ import threading
 import xmltodict
 import time
 import queue
+import re
 import os
 import platform
 import json
+import multiprocessing
 import xml.etree.ElementTree as ET
 from datetime import datetime
 from PyQt5.QtCore import QObject, pyqtSignal
@@ -30,7 +32,6 @@ logging.basicConfig(
 # NOTES
 
 # todo: add stop button in UI in case one of the queues doesn't close
-# todo: append to existing file seems to always append to csv numbered 9 for some reason
 
 # create signal instance to communicate with the UI
 class AgentSignals(QObject):
@@ -46,9 +47,8 @@ agent_signals = AgentSignals()
 
 class SearchAgent:
 
-    # SerpApi personal API key to access the endpoint
     def __init__(self):
-        self.api_key = "31685c8e1078e745ff0a369a59559a99abfab59bbf708e888c0f9c4d73db207a"
+        self.search_running = False
 
     def api(self):
         pass
@@ -162,21 +162,35 @@ class SearchAgent:
     def search_ieee_xplore(self, search_term):
         pass
 
-    def search(self, processing_queue, search_term, max_results):
-        print("Starting search...")
-        arxiv_results = self.search_arxiv(search_term, max_results)
-        processing_queue.put(arxiv_results)
+    def search(self, search_in_queue, processing_queue, max_results):
 
-        # display statement on UI
-        # print("1 second pause in between search for demonstration")
-        # time.sleep(1)
+        self.search_running = True
 
-        print("now for the second search..")
-        pubmed_results = self.search_pubmed(search_term, max_results)
-        processing_queue.put(pubmed_results)
+        while True:
+
+            try:
+
+                search_term = search_in_queue.get(timeout=1)
+
+                if search_term is None:
+                    break
+
+                print("Starting search...")
+                arxiv_results = self.search_arxiv(search_term, max_results)
+                processing_queue.put(arxiv_results)
+
+                print("now for the second search..")
+                pubmed_results = self.search_pubmed(search_term, max_results)
+                processing_queue.put(pubmed_results)
+
+            except queue.Empty:
+                print("Search term queue is empty, waiting...")
+                logging.info("Search term queue is empty, waiting...", extra={"agent": "SEARCH AGENT"})
+                time.sleep(3)
 
         print("search done.")
         # put None to indicate end of search (sentinel value)
+        self.search_running = False
         processing_queue.put(None)
 
 
@@ -235,7 +249,7 @@ class DataProcessingAgent:
             # get author name with default 'No authors listed' value if author is not present
             author_names = [author.get('name', 'No authors listed') for author in authors]
 
-            print(author_names)
+            # print(author_names)
 
             # dictionary for each row
             # handle each case where values might be missing
@@ -297,7 +311,7 @@ class DataProcessingAgent:
                 medline_citation = entry['MedlineCitation']
                 article = medline_citation['Article']
 
-                print("article:", json.dumps(article, indent=4))
+                # print("article:", json.dumps(article, indent=4))
 
                 # PubMed citations may include collaborative group names, handling this case
                 # also handling single/multi authors, and handling the case where LastName OR ForeName is missing
@@ -309,7 +323,7 @@ class DataProcessingAgent:
                     # individual author names
                     if 'Author' in article['AuthorList']:
                         authors = article['AuthorList']['Author']
-                        print("authors", authors)
+                        # print("authors", authors)
 
                         # handle single author as dictionary to list
                         if isinstance(authors, dict):
@@ -394,8 +408,9 @@ class DataProcessingAgent:
                 queue_out.put(processed_data)
 
             except queue.Empty:
+                print("Search result queue is empty, waiting...")
                 logging.info("Search result queue is empty, waiting...", extra={"agent": "PROCESSING AGENT"})
-                time.sleep(1)
+                time.sleep(3)
 
         # Add sentinel to output queue when finished
         queue_out.put(None)
@@ -460,7 +475,122 @@ class DataExportAgent:
                     logging.info(f"Processed {identifier} data has been written to CSV at location {location}", extra={"agent": "EXPORT AGENT"})
 
             except queue.Empty:
+                print("Export queue is empty, waiting...")
                 logging.info("Export queue is empty, waiting...", extra={"agent": "EXPORT AGENT"})
-                time.sleep(1)
+                time.sleep(3)
 
         agent_signals.success.emit("Search, process, and export agents finished - CSV will be opened")
+
+
+def main():
+    # create queues
+    search_in_queue = multiprocessing.Queue()
+    processing_queue = multiprocessing.Queue()
+    queue_out = multiprocessing.Queue()
+
+    # create instances of agents
+    search_agent = SearchAgent()
+    data_processing_agent = DataProcessingAgent()
+    data_export_agent = DataExportAgent()
+
+    # set base file name
+    file_name = "search-export"
+
+    # set base directory
+    base_dir = "/Users/astrid/PycharmProjects/ia-team-project/code/individual/astrid/csv-exports"
+
+    new_csv = input("New CSV? True/False: ").lower() == "true"
+
+    if new_csv:
+        # find highest counter number for existing file names
+        counter = 0
+        while os.path.exists(os.path.join(base_dir, f"{file_name}-{counter}.csv")):
+            counter += 1
+
+        # append counter to new file name
+        file_name = f"{file_name}-{counter}"
+    else:
+        # find existing files with the base file name
+        existing_files = [file for file in os.listdir(base_dir) if file.startswith(file_name) and file.endswith(".csv")]
+
+        if existing_files:
+
+            # use regex to find files matching our file_name pattern
+            existing_files = [file for file in os.listdir(base_dir) if re.match(rf"{file_name}-\d+\.csv$", file)]
+            # extract counters
+            existing_counters = [int(re.search(rf"{file_name}-(\d+)\.csv$", file).group(1)) for file in
+                                 existing_files]
+            # find highest counter
+            highest_counter = max(existing_counters) if existing_counters else 0
+            file_name = f"{file_name}-{highest_counter}"
+
+        else:
+            # base name if no file exists
+            counter = 0
+            file_name = f"{file_name}-{counter}"
+
+    # Construct the absolute file path
+    location = os.path.join(base_dir, f"{file_name}.csv")
+
+    search_term = input("search term? type 'stop' to stop the search")
+    num_results = input("number of results for each search?")
+
+    # Start the search thread
+    search_thread = multiprocessing.Process(target=search_agent.search,
+                                            args=(search_in_queue, processing_queue, num_results))
+    search_thread.start()
+
+    # Start the processing thread
+    processing_thread = multiprocessing.Process(target=data_processing_agent.process_data,
+                                                args=(processing_queue, queue_out,))
+    processing_thread.start()
+
+    # Start the export thread
+    export_thread = multiprocessing.Process(target=data_export_agent.export_data,
+                                            args=(queue_out, location, search_term,))
+    export_thread.start()
+
+    while True:
+
+        search_term = input("search term? type 'stop' to stop the search")
+        if search_term.lower() == "stop":
+            search_in_queue.put(None)
+            print("STOP HAS BEEN GIVEN!")
+            break
+
+        # Add the search term to the input queue
+        search_in_queue.put(search_term)
+
+        # TODO: add user input for which apis to search here
+
+    print("OUT OF LOOP!!!!")
+
+    # wait for all threads to finish to ensure complete data
+    search_thread.join()
+    processing_thread.join()
+    export_thread.join()
+
+    # Construct the absolute path to the CSV file
+    csv_file_path = os.path.join(
+        '/Users/astrid/PycharmProjects/ia-team-project/code/individual/astrid/csv-exports', f'{file_name}.csv')
+
+    # Print a message indicating the completion of the search
+    print("Search completed.")
+
+    # todo: if file was not created for whatever reason and thus doesn't exist, handle this and feed back to UI
+    # open with default file extension app
+    # on windows
+    if platform.system() == 'Windows':
+        os.system(f'start excel.exe {csv_file_path}')
+
+    # on macOS
+    elif platform.system() == 'Darwin':
+        os.system(f'open {csv_file_path}')
+
+    # linux (linux doesn't run MS Excel)
+    elif platform.system() == 'Linux':
+        os.system(f'xdg-open {csv_file_path}')
+
+
+if __name__ == "__main__":
+    main()
