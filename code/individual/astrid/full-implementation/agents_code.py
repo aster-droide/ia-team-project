@@ -210,18 +210,21 @@ class SearchAgent:
         logging.error("Failed to retrieve data from IEEE Xplore API, see exception logs above", extra={"agent": "SEARCH AGENT"})
         return 'IEEE Xplore', "<?xml version='1.0' encoding='UTF-8'?><root></root>"
 
-    def search(self, processing_queue, search_term, max_results):
-        print("Starting search...")
-        arxiv_results = self.search_arxiv(search_term, max_results)
-        processing_queue.put(arxiv_results)
+    def search(self, processing_queue, search_term, max_results, arxiv=False, pubmed=False, ieee=False):
+        if arxiv:
+            print("Searching arXiv...")
+            arxiv_results = self.search_arxiv(search_term, max_results)
+            processing_queue.put(arxiv_results)
 
-        print("now for the second search..")
-        pubmed_results = self.search_pubmed(search_term, max_results)
-        processing_queue.put(pubmed_results)
+        if pubmed:
+            print("Searching PubMed...")
+            pubmed_results = self.search_pubmed(search_term, max_results)
+            processing_queue.put(pubmed_results)
 
-        print("now for the third search..")
-        ieee_results = self.search_ieee_xplore(search_term, max_results)
-        processing_queue.put(ieee_results)
+        if ieee:
+            print("Searching IEEE Xplore...")
+            ieee_results = self.search_ieee_xplore(search_term, max_results)
+            processing_queue.put(ieee_results)
 
         print("search done.")
         # put None to indicate end of search (sentinel value)
@@ -498,12 +501,10 @@ class DataProcessingAgent:
 
                 else:
                     agent_signals.general_error.emit("Unrecognised API response, review app.logs for more info")
-                    logging.error("Unrecognised API response: %s", search_result_entry, extra={"agent": "PROCESSING AGENT"})
+                    logging.error("Unrecognised API response: %s", search_result_entry,
+                                  extra={"agent": "PROCESSING AGENT"})
                     # go to next iteration if response not recognised
                     continue
-
-                # todo: more elif conditions here for more APIs
-                # optional
 
                 # Add the processed data to the output queue
                 export_queue.put(processed_data)

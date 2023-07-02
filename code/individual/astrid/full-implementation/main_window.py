@@ -236,6 +236,11 @@ class MainWin(QWidget):
         # clear info message labels from previous search
         self.clear_info_messages()
 
+        # check which searches are checked
+        arxiv = self.checkbox_arxiv.isChecked()
+        pubmed = self.checkbox_pubmed.isChecked()
+        ieee = self.checkbox_ieee.isChecked()
+
         # get search term from the user input field
         search_term = self.search_term.text()
         new_csv = self.new_csv_checkbox.isChecked()
@@ -246,12 +251,12 @@ class MainWin(QWidget):
         logging.info("NUMBER OF DESIRED SEARCH RESULTS: %s", num_results, extra={"agent": "INFO"})
 
         # call search method
-        self.search(search_term, new_csv, num_results)
+        self.search(search_term, new_csv, num_results, arxiv, pubmed, ieee)
 
         # Clear the QLineEdit
         self.search_term.clear()
 
-    def search(self, search_term, new_csv, num_results):
+    def search(self, search_term, new_csv, num_results, arxiv=False, pubmed=False, ieee=False):
 
         # create queues
         processing_queue = queue.Queue()
@@ -278,7 +283,8 @@ class MainWin(QWidget):
             file_name = f"{file_name}-{counter}"
         else:
             # find existing files with the base file name
-            existing_files = [file for file in os.listdir(base_dir) if file.startswith(file_name) and file.endswith(".csv")]
+            existing_files = [file for file in os.listdir(base_dir) if
+                              file.startswith(file_name) and file.endswith(".csv")]
 
             if existing_files:
 
@@ -304,17 +310,17 @@ class MainWin(QWidget):
         try:
 
             search_thread = threading.Thread(target=search_agent.search,
-                                                    args=(processing_queue, search_term, num_results))
+                                             args=(processing_queue, search_term, num_results, arxiv, pubmed, ieee))
             search_thread.start()
 
             # Start the processing thread
             processing_thread = threading.Thread(target=data_processing_agent.process_data,
-                                                        args=(processing_queue, export_queue,))
+                                                 args=(processing_queue, export_queue,))
             processing_thread.start()
 
             # Start the export thread
             export_thread = threading.Thread(target=data_export_agent.export_data,
-                                                    args=(export_queue, location, search_term,))
+                                             args=(export_queue, location, search_term,))
             export_thread.start()
 
             # wait for all threads to finish to ensure complete data
