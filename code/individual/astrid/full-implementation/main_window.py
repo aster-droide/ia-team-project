@@ -254,9 +254,8 @@ class MainWin(QWidget):
     def search(self, search_term, new_csv, num_results):
 
         # create queues
-        search_in_queue = multiprocessing.Queue()
-        processing_queue = multiprocessing.Queue()
-        queue_out = multiprocessing.Queue()
+        processing_queue = queue.Queue()
+        export_queue = queue.Queue()
 
         # create instances of agents
         search_agent = SearchAgent()
@@ -300,24 +299,22 @@ class MainWin(QWidget):
         # Construct the absolute file path
         location = os.path.join(base_dir, f"{file_name}.csv")
 
-        # Add the search term to the input queue
-        search_in_queue.put(search_term)
-
         # TODO: add user input for which apis to search here
 
         try:
 
-            # Start the search thread
-            search_thread = multiprocessing.Process(target=search_agent.search, args=(search_in_queue, processing_queue, num_results))
+            search_thread = threading.Thread(target=search_agent.search,
+                                                    args=(processing_queue, search_term, num_results))
             search_thread.start()
 
             # Start the processing thread
-            processing_thread = multiprocessing.Process(target=data_processing_agent.process_data, args=(processing_queue, queue_out,))
+            processing_thread = threading.Thread(target=data_processing_agent.process_data,
+                                                        args=(processing_queue, export_queue,))
             processing_thread.start()
 
             # Start the export thread
-            export_thread = multiprocessing.Process(target=data_export_agent.export_data,
-                                             args=(queue_out, location, search_term,))
+            export_thread = threading.Thread(target=data_export_agent.export_data,
+                                                    args=(export_queue, location, search_term,))
             export_thread.start()
 
             # wait for all threads to finish to ensure complete data
