@@ -12,7 +12,7 @@ import xml.etree.ElementTree as ET
 from datetime import datetime
 from PyQt5.QtCore import QObject, pyqtSignal
 
-# todo: search for octopus with search nr 10 and you will get an `authorList` error for PubMed
+# todo: we cant build a stop button on the UI because of the lack of QThread
 
 logging.basicConfig(
     level=logging.INFO,
@@ -38,6 +38,7 @@ class AgentSignals(QObject):
     no_result_pubmed = pyqtSignal(str)
     error_arxiv = pyqtSignal(str)
     error_pubmed = pyqtSignal(str)
+    error_ieee = pyqtSignal(str)
     general_error = pyqtSignal(str)
     success = pyqtSignal(str)
 
@@ -73,13 +74,13 @@ class SearchAgent:
                 print(response.url)
 
                 # return output with source identifier
-                logging.info("arXiv response received as expected, sending to processing queue", extra={"agent": "SEARCH AGENT"})
+                logging.info("arXiv response received, sending to processing queue", extra={"agent": "SEARCH AGENT"})
                 return 'arXiv', response.text
 
             # handle generic exception since various API side errors were thrown during development
             except Exception as e:
                 logging.warning(f"Request error occurred for arXiv: {str(e)}", extra={"agent": "SEARCH AGENT"})
-                logging.info("Retrying...")
+                logging.info("Retrying arXiv...", extra={"agent": "SEARCH AGENT"})
                 time.sleep(retry_delay)
 
         # if all retries fail, return an empty XML string so that the processing agent can deal with this
@@ -130,13 +131,13 @@ class SearchAgent:
                         response.raise_for_status()
 
                         # return output with source identifier
-                        logging.info("PubMed response received as expected, sending to processing queue", extra={"agent": "SEARCH AGENT"})
+                        logging.info("PubMed response received, sending to processing queue", extra={"agent": "SEARCH AGENT"})
                         return 'PubMed', response.text
 
                     # handle generic exception since various API side errors were thrown during development
                     except Exception as e:
                         logging.warning(f"Request error occurred for PubMed efetch API: {str(e)}", extra={"agent": "SEARCH AGENT"})
-                        logging.info("Retrying...", extra={"agent": "SEARCH AGENT"})
+                        logging.info("Retrying PubMed...", extra={"agent": "SEARCH AGENT"})
                         time.sleep(retry_delay)
                         continue
 
@@ -156,8 +157,58 @@ class SearchAgent:
         logging.error("Failed to retrieve data from PubMed API, see exception logs above", extra={"agent": "SEARCH AGENT"})
         return 'PubMed', "<?xml version='1.0' encoding='UTF-8'?><root></root>"
 
-    def search_ieee_xplore(self, search_term):
-        pass
+    @staticmethod
+    def search_ieee_xplore(search_term, num_results):
+        """
+        API Documentation:
+        https://developer.ieee.org/docs/read/Searching_the_IEEE_Xplore_Metadata_API
+
+        :param search_term: search query as indicated by the user
+        :param num_results: max number of results to retrieve
+        :return:
+        """
+
+        url = 'https://ieeexploreapi.ieee.org/api/v1/search/articles'
+        api_key = 'yvfh5bf7gt543sexjv87a3cw'
+
+        # encode the search term (mandatory as stated in IEEE Xplore API docs)
+        # encoded_search_term = parse.quote(search_term)
+
+        # Build the query parameters
+        params = {
+            'apikey': api_key,
+            'querytext': f'title:"{search_term}" OR abstract:"{search_term}"',
+            'format': 'xml',
+            'max_records': num_results
+        }
+
+        # set max retries for API calls in case there is an error on the API side
+        max_retries = 3
+        # 1second delay per try
+        retry_delay = 1
+
+        for _ in range(max_retries):
+            logging.info("TRYING IEEE XPLORE", extra={"agent": "SEARCH AGENT"})
+
+            try:
+                # requests url encodes the query params
+                response = requests.get(url, params=params)
+                print(response.url)
+                # return output with source identifier
+                logging.info("IEEE Xplore response received, sending to processing queue", extra={"agent": "SEARCH AGENT"})
+                return 'IEEE Xplore', response.text
+
+            # handle generic exception since various API side errors were thrown during development
+            except Exception as e:
+                logging.warning(f"Request error occurred for IEEE Xplore: {str(e)}", extra={"agent": "SEARCH AGENT"})
+                logging.info("Retrying IEEE Xplore...", extra={"agent": "SEARCH AGENT"})
+                time.sleep(retry_delay)
+                continue
+
+        # if all retries fail, return an empty XML string so that the processing agent can deal with this
+        agent_signals.error_ieee.emit("Failed to retrieve data from IEEE Xplore API, review app.logs for more info")
+        logging.error("Failed to retrieve data from IEEE Xplore API, see exception logs above", extra={"agent": "SEARCH AGENT"})
+        return 'IEEE Xplore', "<?xml version='1.0' encoding='UTF-8'?><root></root>"
 
     def search(self, processing_queue, search_term, max_results):
         print("Starting search...")
@@ -167,6 +218,10 @@ class SearchAgent:
         print("now for the second search..")
         pubmed_results = self.search_pubmed(search_term, max_results)
         processing_queue.put(pubmed_results)
+
+        print("now for the third search..")
+        ieee_results = self.search_ieee_xplore(search_term, max_results)
+        processing_queue.put(ieee_results)
 
         print("search done.")
         # put None to indicate end of search (sentinel value)
@@ -199,7 +254,7 @@ class DataProcessingAgent:
                 if str(e) == "'entry'":
                     logging.warning(f"No search result for this search term for arXiv", extra={"agent": "PROCESSING AGENT"})
                     # pass message to UI
-                    agent_signals.no_result_arxiv.emit("No search results for this search term for arXiv")
+                    agent_signals.no_result_arxiv.emit("No search result for this search term for arXiv")
                     return 'arXiv', 'No search result for this search term'
                 # print other KeyError
                 else:
@@ -228,8 +283,6 @@ class DataProcessingAgent:
             # get author name with default 'No authors listed' value if author is not present
             author_names = [author.get('name', 'No authors listed') for author in authors]
 
-            print(author_names)
-
             # dictionary for each row
             # handle each case where values might be missing
             row = {
@@ -251,7 +304,7 @@ class DataProcessingAgent:
         # log if no search results presents
         if pubmed_results == 'No search result for this search term':
             logging.warning('No search result for this search term for PubMed', extra={"agent": "PROCESSING AGENT"})
-            agent_signals.no_result_pubmed.emit("No search results for this search term for PubMed")
+            agent_signals.no_result_pubmed.emit("No search result for this search term for PubMed")
             return 'PubMed', pubmed_results
 
         else:
@@ -290,7 +343,7 @@ class DataProcessingAgent:
                 medline_citation = entry['MedlineCitation']
                 article = medline_citation['Article']
 
-                print("article:", json.dumps(article, indent=4))
+                # print("article:", json.dumps(article, indent=4))
 
                 # PubMed citations may include collaborative group names, handling this case
                 # also handling single/multi authors, and handling the case where LastName OR ForeName is missing
@@ -302,7 +355,7 @@ class DataProcessingAgent:
                     # individual author names
                     if 'Author' in article['AuthorList']:
                         authors = article['AuthorList']['Author']
-                        print("authors", authors)
+                        # print("authors", authors)
 
                         # handle single author as dictionary to list
                         if isinstance(authors, dict):
@@ -345,6 +398,70 @@ class DataProcessingAgent:
             logging.info("PubMed processing finished", extra={"agent": "PROCESSING AGENT"})
             return 'PubMed', processed_data
 
+    @staticmethod
+    def process_ieee_explore(ieee_results):
+        logging.info("Starting IEEE Xplore processing...", extra={"agent": "PROCESSING AGENT"})
+
+        processed_data = []
+
+        dict_data = xmltodict.parse(ieee_results)
+        print("IEEE")
+        print(json.dumps(dict_data, indent=4))
+
+        if dict_data:
+            try:
+                articles = dict_data['articles']['article']
+            except KeyError as e:
+                # If `article` is missing from `articles`, then there are no search results
+                if str(e) == "'article'":
+                    logging.warning("No search result for this search term for IEEE Xplore",
+                                    extra={"agent": "PROCESSING AGENT"})
+                    # emit signal to inform UI about the no result
+                    # agent_signals.no_result_ieee.emit("No search result for this search term for IEEE Xplore")
+                    return 'IEEE Xplore', 'No search result for this search term'
+                else:
+                    # agent_signals.error_ieee.emit("Unexpected response from IEEE Xplore,
+                    # review app.logs for more info")
+                    logging.error(f"Unexpected response from IEEE Xplore, KeyError: {e}",
+                                  extra={"agent": "PROCESSING AGENT"})
+                articles = []
+        else:
+            agent_signals.error_ieee.emit("Unexpected response from IEEE Xplore, review app.logs for more info")
+            logging.warning("Empty response from IEEE Xplore", extra={"agent": "PROCESSING AGENT"})
+            articles = []
+
+        # Handle a single article as dictionary to list
+        if not isinstance(articles, list):
+            articles = [articles]
+
+        # todo: DOI after all?
+        # iterate through each article in the response
+        for article in articles:
+            author_names = []
+
+            # handle the case if `authors` is `null` and extract author names
+            if 'authors' in article and article['authors']:
+                authors = article['authors'].get('author', [])
+                if not isinstance(authors, list):
+                    authors = [authors]
+                author_names = [author['full_name'] for author in authors]
+
+            # create a dictionary for each article
+            row = {
+                'title': article['title'] if 'title' in article else "No title present",
+                'summary/abstract': article['abstract'] if 'abstract' in article else "No abstract present",
+                'author_names': author_names,
+                'url': article['html_url'] if 'html_url' in article else "No URL present"
+            }
+
+            print('ieee row: ', row)
+
+            # Add the article to the processed data list
+            processed_data.append(row)
+
+        logging.info("IEEE Xplore processing finished", extra={"agent": "PROCESSING AGENT"})
+        return 'IEEE Xplore', processed_data
+
     def process_data(self, processing_queue, export_queue):
 
         # always
@@ -373,6 +490,11 @@ class DataProcessingAgent:
                 elif identifier == 'PubMed':
                     logging.info("PROCESS IDENTIFIER is PubMed", extra={"agent": "PROCESSING AGENT"})
                     processed_data = self.process_pubmed(response_data)
+
+                # elif pubmed
+                elif identifier == 'IEEE Xplore':
+                    logging.info("PROCESS IDENTIFIER is IEEE Xplore", extra={"agent": "PROCESSING AGENT"})
+                    processed_data = self.process_ieee_explore(response_data)
 
                 else:
                     agent_signals.general_error.emit("Unrecognised API response, review app.logs for more info")
