@@ -207,7 +207,7 @@ class MainWin(QWidget):
         agent_signals.success.connect(self.handle_success)
 
     def enable_buttons(self):
-        # enable the 'Search' and 'Stop' buttons when 'Submit' button is clicked
+        # enable the 'Search' and 'Finish' buttons when 'Submit' button is clicked
         # self.search_button.setEnabled(True)
         self.stop_button.setEnabled(True)
 

@@ -260,8 +260,9 @@ class DataProcessingAgent:
         try:
             dict_data = xmltodict.parse(arxiv_results)
         except Exception as e:
+            agent_signals.error_arxiv.emit("Unexpected response from arXiv, review app.logs for more info")
             logger.error(f"Failed to parse XML data: {e}", extra={"agent": "PROCESSING AGENT"})
-            return {'error': 'XML parsing error'}
+            return 'arXiv', 'unexpected response'
 
         # activates response log pre-processing
         # logger.info(dict_data, extra={"agent": "PROCESSING AGENT"})
@@ -280,13 +281,13 @@ class DataProcessingAgent:
                 else:
                     agent_signals.error_arxiv.emit("Unexpected response from arXiv, review app.logs for more info")
                     logger.error(f"Unexpected response from arXiv, KeyError {e}", extra={"agent": "PROCESSING AGENT"})
-                entries = []
+                    return 'arXiv', 'unexpected response'
         else:
             # this should never be hit because the search agent returns an empty xml for "processing" so
             # `dict_data` should never be empty, however putting this here just in case
             agent_signals.error_arxiv.emit("Unexpected response from arXiv, review app.logs for more info")
             logger.warning("Empty response from arXiv", extra={"agent": "PROCESSING AGENT"})
-            entries = []
+            return 'arXiv', 'unexpected response'
 
         # single entry is returned as dict, convert to list
         if not isinstance(entries, list):
@@ -338,8 +339,9 @@ class DataProcessingAgent:
             try:
                 dict_data = xmltodict.parse(pubmed_results)
             except Exception as e:
+                agent_signals.error_pubmed.emit("Unexpected response from PubMed, review app.logs for more info")
                 logger.error(f"Failed to parse XML data: {e}", extra={"agent": "PROCESSING AGENT"})
-                return {'error': 'XML parsing error'}
+                return 'PubMed', 'unexpected response'
 
             # Activates response log pre-processing
             # logger.info(dict_data, extra={"agent": "PROCESSING AGENT"})
@@ -350,10 +352,10 @@ class DataProcessingAgent:
                 except KeyError as e:
                     agent_signals.error_pubmed.emit("Unexpected response from PubMed, review app.logs for more info")
                     logger.error(f"Unexpected response from pubmed KeyError: {e}. Response: {dict_data}", extra={"agent": "PROCESSING AGENT"})
-                    entries = []
+                    return 'PubMed', 'unexpected response'
             else:
                 logger.warning("Empty response from pubmed", extra={"agent": "PROCESSING AGENT"})
-                entries = []
+                return 'PubMed', 'unexpected response'
 
             # single entry is returned as dict, convert to list
             if not isinstance(entries, list):
@@ -427,8 +429,9 @@ class DataProcessingAgent:
         try:
             dict_data = xmltodict.parse(ieee_results)
         except Exception as e:
+            agent_signals.error_ieee.emit("Unexpected response from IEEE Xplore, review app.logs for more info")
             logger.error(f"Failed to parse XML data: {e}", extra={"agent": "PROCESSING AGENT"})
-            return {'error': 'XML parsing error'}
+            return 'IEEE Xplore', 'unexpected response'
 
         # activates response log pre-processing
         # logger.info(dict_data, extra={"agent": "PROCESSING AGENT"})
@@ -440,19 +443,19 @@ class DataProcessingAgent:
                 # If `article` is missing from `articles`, then there are no search results
                 if str(e) == "'article'":
                     logger.warning("No search result for this search term for IEEE Xplore",
-                                    extra={"agent": "PROCESSING AGENT"})
+                                   extra={"agent": "PROCESSING AGENT"})
                     # emit signal to inform UI about the no result
                     agent_signals.no_result_ieee.emit("No search result for this search term for IEEE Xplore")
                     return 'IEEE Xplore', 'No search result for this search term'
                 else:
                     agent_signals.error_ieee.emit("Unexpected response from IEEE Xplore, review app.logs for more info")
                     logger.error(f"Unexpected response from IEEE Xplore, KeyError: {e}",
-                                  extra={"agent": "PROCESSING AGENT"})
-                articles = []
+                                 extra={"agent": "PROCESSING AGENT"})
+                    return 'IEEE Xplore', 'unexpected response'
         else:
             agent_signals.error_ieee.emit("Unexpected response from IEEE Xplore, review app.logs for more info")
             logger.warning("Empty response from IEEE Xplore", extra={"agent": "PROCESSING AGENT"})
-            articles = []
+            return 'IEEE Xplore', 'unexpected response'
 
         # Handle a single article as dictionary to list
         if not isinstance(articles, list):
@@ -536,7 +539,7 @@ class DataProcessingAgent:
                 else:
                     agent_signals.general_error.emit("Unrecognised API response, review app.logs for more info")
                     logger.error("Unrecognised API response: %s", search_result_entry,
-                                  extra={"agent": "PROCESSING AGENT"})
+                                 extra={"agent": "PROCESSING AGENT"})
                     # go to next iteration if response not recognised
                     continue
 
@@ -583,8 +586,12 @@ class DataExportAgent:
                 # source identifier for logs
                 identifier, processed_data = processed_result_entry
 
+                # error handling
                 if processed_data == 'No search result for this search term':
-                    logger.info(f"No search results for {identifier}, no need to export data - continue", extra={"agent": "EXPORT AGENT"})
+                    logger.info(f"No search results for {identifier}, nothing to export - continue", extra={"agent": "EXPORT AGENT"})
+                    continue
+                elif processed_data == 'unexpected response':
+                    logger.info(f"Unexpected response for {identifier}, nothing to export - continue", extra={"agent": "EXPORT AGENT"})
                     continue
                 else:
                     logger.info(f"Exporting processed {identifier} data to CSV...", extra={"agent": "EXPORT AGENT"})
