@@ -11,22 +11,7 @@ from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QVBoxLayout, QHBoxLay
     QSpinBox, QScrollArea
 from agents_code import agent_signals, SearchAgent, DataProcessingAgent, DataExportAgent
 
-win_width, win_height = 800, 600
-
-# todo: instead of adding a button to open CSV rather than opening automatically and print out path location
-#  I think it's better to just open the CSV since it's unpredictable which CSV will open when something has gone wrong
-#  with the search or the code, if we open the file automatically it will just be the file we're working in
-#  if nothing has been written for whatever reason i don't want the program to open a file
-
-# todo: when nothing is selected, error on the UI / don't allow it (grey out submit?) also for search phrase?
-
-# todo: checkboxes for APIs
-
-# todo: add restrictions on UI level, will be easier for testing. We can assume the endpoints will have their error
-#  handling in place so we don't need to deal with that. Do put an "unexpected response" message when the APIs results
-#  are unexpected
-
-# todo: add our names in corner of UI
+win_width, win_height = 800, 650
 
 
 # Set up logging to a file
@@ -51,11 +36,23 @@ class MainWin(QWidget):
                                   "choose the max number of results you'd like to see per search,&nbsp;and enter your "
                                   "search term.")
 
+        # QLabel widget for our names
+        self.names_label = QLabel("Astrid van Toor <br> Leigh Feaviour")
+        self.names_label.setStyleSheet("font-size: 8px;")  # Set the font size
+        self.names_label.setAlignment(Qt.AlignBottom | Qt.AlignRight)
+
         # create checkboxes for database search option
         self.checkbox_all = QCheckBox("Select All")
         self.checkbox_arxiv = QCheckBox("Search arXiv")
         self.checkbox_pubmed = QCheckBox("Search PubMed")
         self.checkbox_ieee = QCheckBox("Search IEEE Xplore")
+
+        # select all checkboxes is "Select All" is checked
+        self.checkbox_all.stateChanged.connect(self.handle_select_all)
+        # monitor checkbox states for form validation (need a checkbox and text)
+        self.checkbox_arxiv.stateChanged.connect(self.validate_form)
+        self.checkbox_pubmed.stateChanged.connect(self.validate_form)
+        self.checkbox_ieee.stateChanged.connect(self.validate_form)
 
         # QLabel text label for search term
         self.search_instruction_label = QLabel("Enter search term:")
@@ -80,10 +77,14 @@ class MainWin(QWidget):
         self.search_term = QLineEdit()
         # set character limit of 255
         self.search_term.setMaxLength(255)
+        # check if form is valid to enable submit button
+        self.search_term.textChanged.connect(self.validate_form)
 
         # QPushButton for submitting the input
         self.submit_button = QPushButton("Submit")
         self.submit_button.clicked.connect(self.handle_submit)
+        # set submit button to False initially
+        self.submit_button.setEnabled(False)
 
         # vertical layout
         vertical_layout = QVBoxLayout()
@@ -110,6 +111,8 @@ class MainWin(QWidget):
         self.no_result_pubmed.setStyleSheet("color: red")
         self.error_arxiv = QLabel(self)
         self.error_arxiv.setStyleSheet("color: red")
+        self.error_ieee = QLabel(self)
+        self.error_ieee.setStyleSheet("color: red")
         self.error_pubmed = QLabel(self)
         self.error_pubmed.setStyleSheet("color: red")
         self.general_error = QLabel(self)
@@ -129,41 +132,33 @@ class MainWin(QWidget):
         info_layout.addWidget(self.no_result_arxiv)
         info_layout.addWidget(self.no_result_pubmed)
         info_layout.addWidget(self.error_arxiv)
+        info_layout.addWidget(self.error_ieee)
         info_layout.addWidget(self.error_pubmed)
         info_layout.addWidget(self.general_error)
         info_layout.addWidget(self.success)
         info_layout.addWidget(self.finished)
         info_widget.setLayout(info_layout)
 
-        # another vertical layout for info messages
-        vertical_info_layout = QVBoxLayout()
+        # create bottom layout for the scroll area and our names
+        bottom_layout = QVBoxLayout()
+        bottom_layout.addWidget(self.scroll_area)
+        bottom_layout.addWidget(self.names_label)
         self.scroll_area.setWidget(info_widget)
-        vertical_info_layout.addWidget(self.scroll_area)
-        # vertical_info_layout.addWidget(self.no_result_pubmed)
-        # vertical_info_layout.addWidget(self.error_arxiv)
-        # vertical_info_layout.addWidget(self.error_pubmed)
-        # vertical_info_layout.addWidget(self.general_error)
-        # vertical_info_layout.addWidget(self.success)
-        # vertical_info_layout.addWidget(self.finished)
 
         # Add layouts to the main layout
         main_layout = QVBoxLayout()
         main_layout.addLayout(vertical_layout)
         main_layout.addLayout(input_layout)
-        main_layout.addLayout(vertical_info_layout)
+        main_layout.addLayout(bottom_layout)
 
         # Set the layout for the widget
         self.setLayout(main_layout)
-
-        self.checkbox_all.stateChanged.connect(self.handle_select_all)
-        # self.checkbox_arxiv.stateChanged.connect(self.handle_checkbox_state)
-        # self.checkbox_pubmed.stateChanged.connect(self.handle_checkbox_state)
-        # self.checkbox_ieee.stateChanged.connect(self.handle_checkbox_state)
 
         # handle agent signals
         agent_signals.no_result_arxiv.connect(self.handle_no_result_arxiv)
         agent_signals.no_result_pubmed.connect(self.handle_no_result_pubmed)
         agent_signals.error_arxiv.connect(self.handle_error_arxiv)
+        agent_signals.error_ieee.connect(self.handle_error_ieee)
         agent_signals.error_pubmed.connect(self.handle_error_pubmed)
         agent_signals.general_error.connect(self.handle_general_error)
         agent_signals.success.connect(self.handle_success)
@@ -182,6 +177,12 @@ class MainWin(QWidget):
 
     def handle_error_arxiv(self, message):
         self.error_arxiv.setText(message)
+        # resize scroll area to fit message content
+        self.scroll_area.updateGeometry()
+        self.scroll_area.verticalScrollBar().setValue(self.scroll_area.verticalScrollBar().maximum())
+
+    def handle_error_ieee(self, message):
+        self.error_ieee.setText(message)
         # resize scroll area to fit message content
         self.scroll_area.updateGeometry()
         self.scroll_area.verticalScrollBar().setValue(self.scroll_area.verticalScrollBar().maximum())
@@ -209,6 +210,17 @@ class MainWin(QWidget):
         # resize scroll area to fit message content
         self.scroll_area.updateGeometry()
         self.scroll_area.verticalScrollBar().setValue(self.scroll_area.verticalScrollBar().maximum())
+
+    def validate_form(self):
+        # check if at least one checkbox is selected
+        checkboxes_checked = self.checkbox_arxiv.isChecked() or self.checkbox_pubmed.isChecked() or \
+                             self.checkbox_ieee.isChecked()
+
+        # check if search term is not empty
+        search_term_valid = bool(self.search_term.text().strip())
+
+        # enable or disable submit button based on form validity
+        self.submit_button.setEnabled(checkboxes_checked and search_term_valid)
 
     def handle_select_all(self, state):
         # get state of "Select All" checkbox
@@ -304,8 +316,6 @@ class MainWin(QWidget):
 
         # Construct the absolute file path
         location = os.path.join(base_dir, f"{file_name}.csv")
-
-        # TODO: add user input for which apis to search here
 
         try:
 

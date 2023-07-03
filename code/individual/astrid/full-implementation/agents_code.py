@@ -22,11 +22,18 @@ logging.basicConfig(
 )
 
 # NOTES
-# todo: arxiv and pubmed provide xml only, IEEE provides json but sticking with xml for consistency and then
+# arxiv and pubmed provide xml only, IEEE provides json but sticking with xml for consistency and then
 #  transforming locally
-# todo: chosen to go for direct database link rather than DOI as DOI is not available for all results
-# todo: excel has limitations - it's not recognising the encoding, there is a workaround through importing manually:
+
+# chosen to go for direct database link rather than DOI as DOI is not available for all results
+
+# excel has limitations - it's not recognising the encoding, there is a workaround through importing manually:
 #  https://stackoverflow.com/questions/6002256/is-it-possible-to-force-excel-recognize-utf-8-csv-files-automatically/6488070#6488070
+
+# it looks like IEEE Xplore and arXiv API are hosted on the same server, they return the same connection errors
+# simultaneously
+# (Caused by NewConnectionError('<urllib3.connection.HTTPSConnection object at 0x7f8b804f48b0>: Failed to establish
+# a new connection: [Errno 8] nodename nor servname provided, or not known'))
 # NOTES
 
 # todo: add stop button in UI in case one of the queues doesn't close
@@ -423,8 +430,7 @@ class DataProcessingAgent:
                     # agent_signals.no_result_ieee.emit("No search result for this search term for IEEE Xplore")
                     return 'IEEE Xplore', 'No search result for this search term'
                 else:
-                    # agent_signals.error_ieee.emit("Unexpected response from IEEE Xplore,
-                    # review app.logs for more info")
+                    agent_signals.error_ieee.emit("Unexpected response from IEEE Xplore, review app.logs for more info")
                     logging.error(f"Unexpected response from IEEE Xplore, KeyError: {e}",
                                   extra={"agent": "PROCESSING AGENT"})
                 articles = []
