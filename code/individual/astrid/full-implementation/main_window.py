@@ -6,7 +6,7 @@ import platform
 import sys
 import logging
 import multiprocessing
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, QThread, pyqtSignal
 from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QVBoxLayout, QHBoxLayout, QLineEdit, QPushButton, QCheckBox, \
     QSpinBox, QScrollArea
 from agents_code import agent_signals, SearchAgent, DataProcessingAgent, DataExportAgent
@@ -26,6 +26,8 @@ logging.basicConfig(
 class MainWin(QWidget):
     def __init__(self):
         super().__init__()
+
+        self.worker = None
 
         self.setWindowTitle("Academic Research Tool")
         self.resize(win_width, win_height)
@@ -262,13 +264,40 @@ class MainWin(QWidget):
         logging.info("NEW CSV: %s", new_csv, extra={"agent": "INFO"})
         logging.info("NUMBER OF DESIRED SEARCH RESULTS: %s", num_results, extra={"agent": "INFO"})
 
-        # call search method
-        self.search(search_term, new_csv, num_results, arxiv, pubmed, ieee)
+        self.worker = Worker(search_term, new_csv, num_results, arxiv, pubmed, ieee)
+        self.worker.search_complete.connect(widget.handle_search_complete)
+        self.worker.start()
 
         # Clear the QLineEdit
         self.search_term.clear()
 
-    def search(self, search_term, new_csv, num_results, arxiv=False, pubmed=False, ieee=False):
+    def handle_search_complete(self, csv_file_path):
+        # self.handle_search_finished()
+
+        if self.worker is not None:
+            self.worker.quit()
+            self.worker.wait()
+            self.worker.deleteLater()
+            self.worker = None
+
+        self.handle_finished("Search complete, CSV has been opened in default .csv extension application. "
+                             f"<br>The file path is: {csv_file_path}")
+
+
+class Worker(QThread):
+    search_complete = pyqtSignal(str)
+    # finished = pyqtSignal()
+
+    def __init__(self, search_term, new_csv, num_results, arxiv=False, pubmed=False, ieee=False):
+        super().__init__()
+        self.search_term = search_term
+        self.new_csv = new_csv
+        self.num_results = num_results
+        self.arxiv = arxiv
+        self.pubmed = pubmed
+        self.ieee = ieee
+
+    def run(self):
 
         # create queues
         processing_queue = queue.Queue()
@@ -285,7 +314,7 @@ class MainWin(QWidget):
         # set base directory
         base_dir = "/Users/astrid/PycharmProjects/ia-team-project/code/individual/astrid/csv-exports"
 
-        if new_csv:
+        if self.new_csv:
             # find highest counter number for existing file names
             counter = 0
             while os.path.exists(os.path.join(base_dir, f"{file_name}-{counter}.csv")):
@@ -320,7 +349,7 @@ class MainWin(QWidget):
         try:
 
             search_thread = threading.Thread(target=search_agent.search,
-                                             args=(processing_queue, search_term, num_results, arxiv, pubmed, ieee))
+                                             args=(processing_queue, self.search_term, self.num_results, self.arxiv, self.pubmed, self.ieee))
             search_thread.start()
 
             # Start the processing thread
@@ -330,7 +359,7 @@ class MainWin(QWidget):
 
             # Start the export thread
             export_thread = threading.Thread(target=data_export_agent.export_data,
-                                             args=(export_queue, location, search_term,))
+                                             args=(export_queue, location, self.search_term,))
             export_thread.start()
 
             # wait for all threads to finish to ensure complete data
@@ -356,8 +385,7 @@ class MainWin(QWidget):
             elif platform.system() == 'Linux':
                 os.system(f'xdg-open {csv_file_path}')
 
-            self.handle_finished("Search complete, CSV has been opened in default .csv extension application. "
-                                 f"<br>The file path is: {csv_file_path}")
+            self.search_complete.emit(csv_file_path)
 
         except Exception as e:
             # todo: add UI message for this
