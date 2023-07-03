@@ -11,7 +11,7 @@ from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QVBoxLayout, QHBoxLay
     QSpinBox, QScrollArea
 from agents_code import agent_signals, SearchAgent, DataProcessingAgent, DataExportAgent
 
-win_width, win_height = 800, 675
+win_width, win_height = 800, 650
 
 # root logger to lowest level for debugging
 logging.getLogger().setLevel(logging.DEBUG)
@@ -138,6 +138,8 @@ class MainWin(QWidget):
         input_layout.addWidget(self.stop_button)
 
         # QLabels for info messaging
+        self.search_term_update = QLabel(self)
+        self.search_term_update.setStyleSheet("color: blue")
         self.no_result_arxiv = QLabel(self)
         self.no_result_arxiv.setStyleSheet("color: red")
         self.no_result_pubmed = QLabel(self)
@@ -153,7 +155,7 @@ class MainWin(QWidget):
         self.general_error = QLabel(self)
         self.general_error.setStyleSheet("color: red")
         self.stop_signal = QLabel(self)
-        self.stop_signal.setStyleSheet("color: orange")
+        self.stop_signal.setStyleSheet("color: purple")
         self.success = QLabel(self)
         self.success.setStyleSheet("color: blue")
         self.finished = QLabel(self)
@@ -166,6 +168,7 @@ class MainWin(QWidget):
         # create QWidget to hold the info QLabels
         info_widget = QWidget()
         info_layout = QVBoxLayout()
+        info_layout.addWidget(self.search_term_update)
         info_layout.addWidget(self.no_result_arxiv)
         info_layout.addWidget(self.no_result_pubmed)
         info_layout.addWidget(self.no_result_ieee)
@@ -341,6 +344,12 @@ class MainWin(QWidget):
             # Clear the QLineEdit
             self.search_term.clear()
 
+            # make sure scroll bar is at the top
+            self.scroll_area.verticalScrollBar().setValue(self.scroll_area.verticalScrollBar().minimum())
+
+            # show search terms on UI
+            self.search_term_update.setText(f"Searching for {search_term}...")
+
             #
             self.first_search_performed = True
 
@@ -361,6 +370,8 @@ class MainWin(QWidget):
 
             data = (search_term, num_results, arxiv, pubmed, ieee)
 
+            self.search_term_update.setText(self.search_term_update.text() + "<br>Searching for {0}...".format(search_term))
+
             # Clear the QLineEdit
             self.search_term.clear()
 
@@ -374,6 +385,9 @@ class MainWin(QWidget):
         self.submit_button.setEnabled(False)
         self.stop_signal.setText("Stop signalled, finishing threads...")
 
+        # scroll to bottom of scroll area
+        self.scroll_area.verticalScrollBar().setValue(self.scroll_area.verticalScrollBar().maximum())
+
     def handle_search_complete(self, csv_file_path):
 
         if self.worker is not None:
@@ -381,7 +395,6 @@ class MainWin(QWidget):
             self.worker.wait()
             self.worker.deleteLater()
             self.worker = None
-
 
         self.handle_finished("Search complete, CSV has been opened in default .csv extension application. "
                              f"<br>The file path is: {csv_file_path}")
@@ -399,6 +412,9 @@ class MainWin(QWidget):
         # and disable stop buttons
         # self.search_button.setEnabled(False)
         self.stop_button.setEnabled(False)
+
+        # scroll to bottom of scroll area
+        self.scroll_area.verticalScrollBar().setValue(self.scroll_area.verticalScrollBar().maximum())
 
 
 class Worker(QThread):
