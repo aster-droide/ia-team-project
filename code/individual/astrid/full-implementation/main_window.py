@@ -5,27 +5,48 @@ import re
 import platform
 import sys
 import logging
-import multiprocessing
-from PyQt5.QtCore import Qt, QThread, pyqtSignal
+import appdirs
+from PyQt5.QtCore import Qt, QThread, pyqtSignal, pyqtSlot
 from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QVBoxLayout, QHBoxLayout, QLineEdit, QPushButton, QCheckBox, \
     QSpinBox, QScrollArea
 from agents_code import agent_signals, SearchAgent, DataProcessingAgent, DataExportAgent
 
-win_width, win_height = 800, 650
+win_width, win_height = 800, 675
 
+# root logger to lowest level for debugging
+logging.getLogger().setLevel(logging.DEBUG)
 
-# Set up logging to a file
-logging.basicConfig(
-    filename='app.log',
-    level=logging.INFO,
-    filemode='w',
-    format='%(asctime)s - %(levelname)s - %(agent)s - %(message)s'
-)
+# custom logger
+logger = logging.getLogger(__name__)
+
+# handler log messages and set output (CLI & log file)
+console_handler = logging.StreamHandler()
+file_handler = logging.FileHandler('app.log')
+
+# level of logging
+console_handler.setLevel(logging.INFO)
+file_handler.setLevel(logging.INFO)
+
+# set formatting and add to handlers
+log_format = logging.Formatter('%(asctime)s - %(levelname)s - %(agent)s - %(message)s')
+console_handler.setFormatter(log_format)
+file_handler.setFormatter(log_format)
+
+# add handlers to logger
+logger.addHandler(console_handler)
+logger.addHandler(file_handler)
+
+# ensure log messages will be logged
+logging.getLogger().propagate = True
 
 
 class MainWin(QWidget):
+    send_message = pyqtSignal(tuple)
+
     def __init__(self):
         super().__init__()
+
+        self.first_search_performed = False
 
         self.worker = None
 
@@ -83,10 +104,18 @@ class MainWin(QWidget):
         self.search_term.textChanged.connect(self.validate_form)
 
         # QPushButton for submitting the input
-        self.submit_button = QPushButton("Submit")
-        self.submit_button.clicked.connect(self.handle_submit)
-        # set submit button to False initially
+        self.submit_button = QPushButton("Search")
+        # self.submit_button.clicked.connect(self.handle_submit)
+        # disable button at initiation
         self.submit_button.setEnabled(False)
+
+        # create 'Search' and 'Finish' buttons and disable them
+        # self.search_button = QPushButton('Search')
+        self.stop_button = QPushButton('Finish')
+        # self.search_button.setEnabled(False)
+        self.stop_button.setEnabled(False)
+        self.submit_button.clicked.connect(self.handle_submit)
+        self.stop_button.clicked.connect(self.handle_stop_button)
 
         # vertical layout
         vertical_layout = QVBoxLayout()
@@ -105,12 +134,16 @@ class MainWin(QWidget):
         input_layout = QHBoxLayout()
         input_layout.addWidget(self.search_term)
         input_layout.addWidget(self.submit_button)
+        # input_layout.addWidget(self.search_button)
+        input_layout.addWidget(self.stop_button)
 
         # QLabels for info messaging
         self.no_result_arxiv = QLabel(self)
         self.no_result_arxiv.setStyleSheet("color: red")
         self.no_result_pubmed = QLabel(self)
         self.no_result_pubmed.setStyleSheet("color: red")
+        self.no_result_ieee = QLabel(self)
+        self.no_result_ieee.setStyleSheet("color: red")
         self.error_arxiv = QLabel(self)
         self.error_arxiv.setStyleSheet("color: red")
         self.error_ieee = QLabel(self)
@@ -119,6 +152,8 @@ class MainWin(QWidget):
         self.error_pubmed.setStyleSheet("color: red")
         self.general_error = QLabel(self)
         self.general_error.setStyleSheet("color: red")
+        self.stop_signal = QLabel(self)
+        self.stop_signal.setStyleSheet("color: orange")
         self.success = QLabel(self)
         self.success.setStyleSheet("color: blue")
         self.finished = QLabel(self)
@@ -133,10 +168,12 @@ class MainWin(QWidget):
         info_layout = QVBoxLayout()
         info_layout.addWidget(self.no_result_arxiv)
         info_layout.addWidget(self.no_result_pubmed)
+        info_layout.addWidget(self.no_result_ieee)
         info_layout.addWidget(self.error_arxiv)
         info_layout.addWidget(self.error_ieee)
         info_layout.addWidget(self.error_pubmed)
         info_layout.addWidget(self.general_error)
+        info_layout.addWidget(self.stop_signal)
         info_layout.addWidget(self.success)
         info_layout.addWidget(self.finished)
         info_widget.setLayout(info_layout)
@@ -156,14 +193,23 @@ class MainWin(QWidget):
         # Set the layout for the widget
         self.setLayout(main_layout)
 
+        # handle button clicks
+        self.submit_button.clicked.connect(self.enable_buttons)
+
         # handle agent signals
         agent_signals.no_result_arxiv.connect(self.handle_no_result_arxiv)
         agent_signals.no_result_pubmed.connect(self.handle_no_result_pubmed)
+        agent_signals.no_result_ieee.connect(self.handle_no_result_ieee)
         agent_signals.error_arxiv.connect(self.handle_error_arxiv)
         agent_signals.error_ieee.connect(self.handle_error_ieee)
         agent_signals.error_pubmed.connect(self.handle_error_pubmed)
         agent_signals.general_error.connect(self.handle_general_error)
         agent_signals.success.connect(self.handle_success)
+
+    def enable_buttons(self):
+        # enable the 'Search' and 'Stop' buttons when 'Submit' button is clicked
+        # self.search_button.setEnabled(True)
+        self.stop_button.setEnabled(True)
 
     def handle_no_result_arxiv(self, message):
         self.no_result_arxiv.setText(message)
@@ -173,6 +219,12 @@ class MainWin(QWidget):
 
     def handle_no_result_pubmed(self, message):
         self.no_result_pubmed.setText(message)
+        # resize scroll area to fit message content
+        self.scroll_area.updateGeometry()
+        self.scroll_area.verticalScrollBar().setValue(self.scroll_area.verticalScrollBar().maximum())
+
+    def handle_no_result_ieee(self, message):
+        self.no_result_ieee.setText(message)
         # resize scroll area to fit message content
         self.scroll_area.updateGeometry()
         self.scroll_area.verticalScrollBar().setValue(self.scroll_area.verticalScrollBar().maximum())
@@ -237,9 +289,11 @@ class MainWin(QWidget):
         """method to clear info messages"""
         self.no_result_arxiv.clear()
         self.no_result_pubmed.clear()
+        self.no_result_ieee.clear()
         self.error_arxiv.clear()
         self.error_pubmed.clear()
         self.general_error.clear()
+        self.stop_signal.clear()
         self.success.clear()
         self.finished.clear()
 
@@ -247,32 +301,80 @@ class MainWin(QWidget):
         self.scroll_area.verticalScrollBar().setValue(0)
 
     def handle_submit(self):
-        # clear info message labels from previous search
-        self.clear_info_messages()
 
-        # check which searches are checked
-        arxiv = self.checkbox_arxiv.isChecked()
-        pubmed = self.checkbox_pubmed.isChecked()
-        ieee = self.checkbox_ieee.isChecked()
+        if not self.first_search_performed:
 
-        # get search term from the user input field
-        search_term = self.search_term.text()
-        new_csv = self.new_csv_checkbox.isChecked()
-        num_results = self.num_results_spinbox.value()
+            # clear info message labels from previous search
+            self.clear_info_messages()
 
-        logging.info("SEARCH TERM: %s", search_term, extra={"agent": "INFO"})
-        logging.info("NEW CSV: %s", new_csv, extra={"agent": "INFO"})
-        logging.info("NUMBER OF DESIRED SEARCH RESULTS: %s", num_results, extra={"agent": "INFO"})
+            # check which searches are checked
+            arxiv = self.checkbox_arxiv.isChecked()
+            pubmed = self.checkbox_pubmed.isChecked()
+            ieee = self.checkbox_ieee.isChecked()
 
-        self.worker = Worker(search_term, new_csv, num_results, arxiv, pubmed, ieee)
-        self.worker.search_complete.connect(widget.handle_search_complete)
-        self.worker.start()
+            # get search term from the user input field
+            search_term = self.search_term.text()
+            new_csv = self.new_csv_checkbox.isChecked()
+            num_results = self.num_results_spinbox.value()
 
-        # Clear the QLineEdit
-        self.search_term.clear()
+            logger.info("SEARCH TERM: %s", search_term, extra={"agent": "INFO"})
+            logger.info("NEW CSV: %s", new_csv, extra={"agent": "INFO"})
+            logger.info("NUMBER OF DESIRED SEARCH RESULTS: %s", num_results, extra={"agent": "INFO"})
+
+            self.worker = Worker(new_csv, num_results, arxiv, pubmed, ieee)
+            self.worker.search_complete.connect(widget.handle_search_complete)
+            self.worker.start()
+
+            self.send_message.connect(self.worker.receive_search_data)
+
+            # send first search through
+            data = (search_term, num_results, arxiv, pubmed, ieee)
+            self.send_message.emit(data)
+
+            # disable the submit button and csv checkbox
+            # self.submit_button.setEnabled(False)
+            self.new_csv_checkbox.setEnabled(False)
+
+            # set button to "Next Search" after first search
+            self.submit_button.setText("Next Search")
+
+            # Clear the QLineEdit
+            self.search_term.clear()
+
+            #
+            self.first_search_performed = True
+
+        else:
+            self.clear_info_messages()
+
+            # check which searches are checked
+            arxiv = self.checkbox_arxiv.isChecked()
+            pubmed = self.checkbox_pubmed.isChecked()
+            ieee = self.checkbox_ieee.isChecked()
+
+            # get search term from the user input field
+            search_term = self.search_term.text()
+            num_results = self.num_results_spinbox.value()
+
+            logger.info("SEARCH TERM: %s", search_term, extra={"agent": "INFO"})
+            logger.info("NUMBER OF DESIRED SEARCH RESULTS: %s", num_results, extra={"agent": "INFO"})
+
+            data = (search_term, num_results, arxiv, pubmed, ieee)
+
+            # Clear the QLineEdit
+            self.search_term.clear()
+
+            self.send_message.emit(data)
+
+    def handle_stop_button(self):
+        # put None into the queue to stop the worker thread
+        self.worker.search_button_queue.put(None)
+        # set submit button back to search and grey out until the search is done
+        self.submit_button.setText("Search")
+        self.submit_button.setEnabled(False)
+        self.stop_signal.setText("Stop signalled, finishing threads...")
 
     def handle_search_complete(self, csv_file_path):
-        # self.handle_search_finished()
 
         if self.worker is not None:
             self.worker.quit()
@@ -280,26 +382,45 @@ class MainWin(QWidget):
             self.worker.deleteLater()
             self.worker = None
 
+
         self.handle_finished("Search complete, CSV has been opened in default .csv extension application. "
                              f"<br>The file path is: {csv_file_path}")
+
+        # enable submit button and csv checkbox again
+        self.submit_button.setEnabled(True)
+        self.new_csv_checkbox.setEnabled(True)
+
+        # reset first search performed
+        self.first_search_performed = False
+
+        # set submit button back to 'Search'
+        self.submit_button.setText("Search")
+
+        # and disable stop buttons
+        # self.search_button.setEnabled(False)
+        self.stop_button.setEnabled(False)
 
 
 class Worker(QThread):
     search_complete = pyqtSignal(str)
-    # finished = pyqtSignal()
 
-    def __init__(self, search_term, new_csv, num_results, arxiv=False, pubmed=False, ieee=False):
+    def __init__(self, new_csv, num_results, arxiv=False, pubmed=False, ieee=False):
         super().__init__()
-        self.search_term = search_term
         self.new_csv = new_csv
         self.num_results = num_results
         self.arxiv = arxiv
         self.pubmed = pubmed
         self.ieee = ieee
+        self.search_button_queue = queue.Queue()
+
+    @pyqtSlot(tuple)
+    def receive_search_data(self, data):
+        self.search_button_queue.put(data)
 
     def run(self):
 
         # create queues
+        search_in_queue = queue.Queue()
         processing_queue = queue.Queue()
         export_queue = queue.Queue()
 
@@ -312,25 +433,27 @@ class Worker(QThread):
         file_name = "search-export"
 
         # set base directory
-        base_dir = "/Users/astrid/PycharmProjects/ia-team-project/code/individual/astrid/csv-exports"
+        user_data_dir = appdirs.user_data_dir(appname="IntelligentSearchAgent")
+        csv_dir = os.path.join(user_data_dir, "csv-exports")
+        os.makedirs(csv_dir, exist_ok=True)
 
         if self.new_csv:
             # find highest counter number for existing file names
             counter = 0
-            while os.path.exists(os.path.join(base_dir, f"{file_name}-{counter}.csv")):
+            while os.path.exists(os.path.join(csv_dir, f"{file_name}-{counter}.csv")):
                 counter += 1
 
             # append counter to new file name
             file_name = f"{file_name}-{counter}"
         else:
             # find existing files with the base file name
-            existing_files = [file for file in os.listdir(base_dir) if
+            existing_files = [file for file in os.listdir(csv_dir) if
                               file.startswith(file_name) and file.endswith(".csv")]
 
             if existing_files:
 
                 # use regex to find files matching our file_name pattern
-                existing_files = [file for file in os.listdir(base_dir) if re.match(rf"{file_name}-\d+\.csv$", file)]
+                existing_files = [file for file in os.listdir(csv_dir) if re.match(rf"{file_name}-\d+\.csv$", file)]
                 # extract counters
                 existing_counters = [int(re.search(rf"{file_name}-(\d+)\.csv$", file).group(1)) for file in
                                      existing_files]
@@ -343,13 +466,12 @@ class Worker(QThread):
                 counter = 0
                 file_name = f"{file_name}-{counter}"
 
-        # Construct the absolute file path
-        location = os.path.join(base_dir, f"{file_name}.csv")
+        # construct file path
+        location = os.path.join(user_data_dir, "csv-exports", f"{file_name}.csv")
 
         try:
-
             search_thread = threading.Thread(target=search_agent.search,
-                                             args=(processing_queue, self.search_term, self.num_results, self.arxiv, self.pubmed, self.ieee))
+                                             args=(search_in_queue, processing_queue,))
             search_thread.start()
 
             # Start the processing thread
@@ -359,37 +481,52 @@ class Worker(QThread):
 
             # Start the export thread
             export_thread = threading.Thread(target=data_export_agent.export_data,
-                                             args=(export_queue, location, self.search_term,))
+                                             args=(export_queue, location,))
             export_thread.start()
+
+            while True:
+
+                data = self.search_button_queue.get()
+
+                # Add the search term to the input queue
+                search_in_queue.put(data)
+
+                if data is None:
+                    break
 
             # wait for all threads to finish to ensure complete data
             search_thread.join()
             processing_thread.join()
             export_thread.join()
 
-            # Construct the absolute path to the CSV file
-            csv_file_path = os.path.join(
-                '/Users/astrid/PycharmProjects/ia-team-project/code/individual/astrid/csv-exports', f'{file_name}.csv')
+            # open .csv with default file extension app, check for existence
 
-            # todo: if file was not created for whatever reason and thus doesn't exist, handle this and feed back to UI
-            # open with default file extension app
             # on windows
             if platform.system() == 'Windows':
-                os.system(f'start excel.exe {csv_file_path}')
+                if os.path.exists(location):
+                    os.system(f'start excel.exe "{location}"')
+                else:
+                    logger.error(f"File {location} does not exist.", extra={"agent": "ERROR"})
 
             # on macOS
             elif platform.system() == 'Darwin':
-                os.system(f'open {csv_file_path}')
+                if os.path.exists(location):
+                    os.system(f'open "{location}"')
+                else:
+                    logger.error(f"File {location} does not exist.", extra={"agent": "ERROR"})
 
             # linux (linux doesn't run MS Excel)
             elif platform.system() == 'Linux':
-                os.system(f'xdg-open {csv_file_path}')
+                if os.path.exists(location):
+                    os.system(f'xdg-open "{location}"')
+                else:
+                    logger.error(f"File {location} does not exist.", extra={"agent": "ERROR"})
 
-            self.search_complete.emit(csv_file_path)
+            self.search_complete.emit(location)
 
         except Exception as e:
             # todo: add UI message for this
-            logging.error(f"An error occurred: {str(e)}", extra={"agent": "ERROR"})
+            logger.error(f"An error occurred: {str(e)}", extra={"agent": "ERROR"})
 
 
 if __name__ == "__main__":
