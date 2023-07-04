@@ -6,33 +6,8 @@ import time
 import queue
 import os
 import xml.etree.ElementTree as ET
+from logging_setup import logger
 from PyQt5.QtCore import QObject, pyqtSignal
-
-# root logger to lowest level for debugging
-logging.getLogger().setLevel(logging.DEBUG)
-
-# custom logger
-logger = logging.getLogger(__name__)
-
-# handler log messages and set output (CLI & log file)
-console_handler = logging.StreamHandler()
-file_handler = logging.FileHandler('app.log')
-
-# level of logging
-console_handler.setLevel(logging.INFO)
-file_handler.setLevel(logging.INFO)
-
-# set formatting and add to handlers
-log_format = logging.Formatter('%(asctime)s - %(levelname)s - %(agent)s - %(message)s')
-console_handler.setFormatter(log_format)
-file_handler.setFormatter(log_format)
-
-# add handlers to logger
-logger.addHandler(console_handler)
-logger.addHandler(file_handler)
-
-# ensure log messages will be logged
-logging.getLogger().propagate = True
 
 
 # create signal instance to communicate with the UI

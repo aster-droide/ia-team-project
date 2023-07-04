@@ -10,34 +10,9 @@ from PyQt5.QtCore import Qt, QThread, pyqtSignal, pyqtSlot
 from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QVBoxLayout, QHBoxLayout, QLineEdit, QPushButton, QCheckBox, \
     QSpinBox, QScrollArea
 from agents_code import agent_signals, SearchAgent, DataProcessingAgent, DataExportAgent
+from logging_setup import logger
 
 win_width, win_height = 800, 650
-
-# root logger to lowest level for debugging
-logging.getLogger().setLevel(logging.DEBUG)
-
-# custom logger
-logger = logging.getLogger(__name__)
-
-# handler log messages and set output (CLI & log file)
-console_handler = logging.StreamHandler()
-file_handler = logging.FileHandler('app.log')
-
-# level of logging
-console_handler.setLevel(logging.INFO)
-file_handler.setLevel(logging.INFO)
-
-# set formatting and add to handlers
-log_format = logging.Formatter('%(asctime)s - %(levelname)s - %(agent)s - %(message)s')
-console_handler.setFormatter(log_format)
-file_handler.setFormatter(log_format)
-
-# add handlers to logger
-logger.addHandler(console_handler)
-logger.addHandler(file_handler)
-
-# ensure log messages will be logged
-logging.getLogger().propagate = True
 
 
 class MainWin(QWidget):
@@ -409,8 +384,7 @@ class MainWin(QWidget):
         # set submit button back to 'Search'
         self.submit_button.setText("Search")
 
-        # and disable stop buttons
-        # self.search_button.setEnabled(False)
+        # and disable stop button
         self.stop_button.setEnabled(False)
 
         # scroll to bottom of scroll area
