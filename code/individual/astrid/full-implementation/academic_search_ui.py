@@ -12,7 +12,7 @@ from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QVBoxLayout, QHBoxLay
 from agents_code import agent_signals, SearchAgent, DataProcessingAgent, DataExportAgent
 from logging_setup import logger
 
-win_width, win_height = 800, 650
+win_width, win_height = 750, 700
 
 
 class MainWin(QWidget):
@@ -31,8 +31,12 @@ class MainWin(QWidget):
         self.intro_label = QLabel("Welcome to the Academic Research Tool! "
                                   "<br><br>"
                                   "Please select the desired search engines,&nbsp;"
-                                  "choose the max number of results you'd like to see per search,&nbsp;and enter your "
-                                  "search term.")
+                                  "choose the maximum number of results you'd like to see per search,&nbsp;"
+                                  "enter your search term then click 'Search'."
+                                  "<br<br>"
+                                  "When you have entered all of your search terms,&nbsp;click 'Finish' to see the "
+                                  "results."
+                                  "<br>")
 
         # QLabel widget for our names
         self.names_label = QLabel("Astrid van Toor <br> Leigh Feaviour")
@@ -53,10 +57,10 @@ class MainWin(QWidget):
         self.checkbox_ieee.stateChanged.connect(self.validate_form)
 
         # QLabel text label for search term
-        self.search_instruction_label = QLabel("Enter search term:")
+        self.search_instruction_label = QLabel("<br>Enter search term:")
 
         # QLabel text label for search number of results instruction
-        self.search_number_label = QLabel("Enter desired number of results (1-50):")
+        self.search_number_label = QLabel("<br>Enter desired number of results (1-50):<br>")
 
         # checkbox for new CSV or not
         self.new_csv_checkbox = QCheckBox("Tick to create new CSV / leave un-ticked to append to "
@@ -269,6 +273,7 @@ class MainWin(QWidget):
         self.no_result_pubmed.clear()
         self.no_result_ieee.clear()
         self.error_arxiv.clear()
+        self.error_ieee.clear()
         self.error_pubmed.clear()
         self.general_error.clear()
         self.stop_signal.clear()
