@@ -4,7 +4,7 @@ import os
 import re
 import platform
 import sys
-import logging
+
 import appdirs
 from PyQt5.QtCore import Qt, QThread, pyqtSignal, pyqtSlot
 from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QVBoxLayout, QHBoxLayout, QLineEdit, QPushButton, QCheckBox, \
@@ -197,43 +197,43 @@ class MainWin(QWidget):
         self.no_result_arxiv.setText(message)
         # resize scroll area to fit message content
         self.scroll_area.updateGeometry()
-        self.scroll_area.verticalScrollBar().setValue(self.scroll_area.verticalScrollBar().maximum())
+        self.scroll_area.verticalScrollBar().setValue(self.scroll_area.verticalScrollBar().minimum())
 
     def handle_no_result_pubmed(self, message):
         self.no_result_pubmed.setText(message)
         # resize scroll area to fit message content
         self.scroll_area.updateGeometry()
-        self.scroll_area.verticalScrollBar().setValue(self.scroll_area.verticalScrollBar().maximum())
+        self.scroll_area.verticalScrollBar().setValue(self.scroll_area.verticalScrollBar().minimum())
 
     def handle_no_result_ieee(self, message):
         self.no_result_ieee.setText(message)
         # resize scroll area to fit message content
         self.scroll_area.updateGeometry()
-        self.scroll_area.verticalScrollBar().setValue(self.scroll_area.verticalScrollBar().maximum())
+        self.scroll_area.verticalScrollBar().setValue(self.scroll_area.verticalScrollBar().minimum())
 
     def handle_error_arxiv(self, message):
         self.error_arxiv.setText(message)
         # resize scroll area to fit message content
         self.scroll_area.updateGeometry()
-        self.scroll_area.verticalScrollBar().setValue(self.scroll_area.verticalScrollBar().maximum())
+        self.scroll_area.verticalScrollBar().setValue(self.scroll_area.verticalScrollBar().minimum())
 
     def handle_error_ieee(self, message):
         self.error_ieee.setText(message)
         # resize scroll area to fit message content
         self.scroll_area.updateGeometry()
-        self.scroll_area.verticalScrollBar().setValue(self.scroll_area.verticalScrollBar().maximum())
+        self.scroll_area.verticalScrollBar().setValue(self.scroll_area.verticalScrollBar().minimum())
 
     def handle_error_pubmed(self, message):
         self.error_pubmed.setText(message)
         # resize scroll area to fit message content
         self.scroll_area.updateGeometry()
-        self.scroll_area.verticalScrollBar().setValue(self.scroll_area.verticalScrollBar().maximum())
+        self.scroll_area.verticalScrollBar().setValue(self.scroll_area.verticalScrollBar().minimum())
 
     def handle_general_error(self, message):
         self.general_error.setText(message)
         # resize scroll area to fit message content
         self.scroll_area.updateGeometry()
-        self.scroll_area.verticalScrollBar().setValue(self.scroll_area.verticalScrollBar().maximum())
+        self.scroll_area.verticalScrollBar().setValue(self.scroll_area.verticalScrollBar().minimum())
 
     def handle_success(self, message):
         self.success.setText(message)
