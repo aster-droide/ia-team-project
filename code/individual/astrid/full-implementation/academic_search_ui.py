@@ -447,7 +447,7 @@ class MainWin(QWidget):
             self.worker = None
 
         # notify user
-        self.handle_finished("Search complete, CSV has been opened in default .csv extension application. "
+        self.handle_finished("Search complete, CSV will be opened in default .csv extension application. "
                              f"<br>The file path is: {csv_file_path}")
 
         # enable submit button and csv checkbox again
