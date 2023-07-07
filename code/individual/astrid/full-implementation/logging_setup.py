@@ -20,6 +20,7 @@ console_handler.setLevel(logging.INFO)
 file_handler.setLevel(logging.INFO)
 
 # set formatting and add to handlers
+# add `agent` to log format to signify which agent is logging
 log_format = logging.Formatter('%(asctime)s - %(levelname)s - %(agent)s - %(message)s')
 console_handler.setFormatter(log_format)
 file_handler.setFormatter(log_format)

@@ -1,33 +1,50 @@
+# import `threading` to allow for asynchronous agent threads
+# this allows the agents to work simultaneously and retrieve results quicker
 import threading
+# import `queue` to work with message queues for communication between agents
 import queue
+# import `os` to be able to check operating system's filepaths
 import os
+# import regular expression libray to match filenames when creating the csv
 import re
+# import `platform` to determine the operating system
 import platform
+# import `sys` to perform system operations such as opening and closing applications
 import sys
-
+# import `appdirs` to set a base directory for export location
 import appdirs
+# import required PyQt5 widgets for UI visualisation
 from PyQt5.QtCore import Qt, QThread, pyqtSignal, pyqtSlot
-from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QVBoxLayout, QHBoxLayout, QLineEdit, QPushButton, QCheckBox, \
-    QSpinBox, QScrollArea
+from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QVBoxLayout, QHBoxLayout, QLineEdit, QPushButton, \
+    QCheckBox, QSpinBox, QScrollArea
+# import the agent signals for UI info messaging and import all agents
 from agents_code import agent_signals, SearchAgent, DataProcessingAgent, DataExportAgent
+# import logger instance for log messages, see `logging_setup.py` for detailed comments
 from logging_setup import logger
 
 win_width, win_height = 750, 700
 
 
 class MainWin(QWidget):
+    """
+    UI main window
+
+    first set up message signal to signify user search query from the `handle_submit` method to the `SearchAgent`
+    message is connected to the `worker` `receive_search_data` @pyqtSlot
+    messages are put from the `search_button_queue` into the `search_in_queue` which is passed as an argument to
+    the `SearchAgent` instance which runs on a thread
+    """
     send_message = pyqtSignal(tuple)
 
     def __init__(self):
         super().__init__()
-
+        # flag for the first performed search, handled in `handle_submit`
         self.first_search_performed = False
-
+        # placeholder variable for existence of `self.worker`
         self.worker = None
-
+        # format UI
         self.setWindowTitle("Academic Research Tool")
         self.resize(win_width, win_height)
-
         self.intro_label = QLabel("Welcome to the Academic Research Tool! "
                                   "<br><br>"
                                   "Please select the desired search engines,&nbsp;"
@@ -116,7 +133,7 @@ class MainWin(QWidget):
         # input_layout.addWidget(self.search_button)
         input_layout.addWidget(self.stop_button)
 
-        # QLabels for info messaging
+        # QLabels for info messaging as received from the backend
         self.search_term_update = QLabel(self)
         self.search_term_update.setStyleSheet("color: blue")
         self.no_result_arxiv = QLabel(self)
@@ -139,6 +156,8 @@ class MainWin(QWidget):
         self.success.setStyleSheet("color: blue")
         self.finished = QLabel(self)
         self.finished.setStyleSheet("color: blue")
+        self.error_message = QLabel(self)
+        self.error_message.setStyleSheet("color: red")
 
         # create a scroll area and set the info QLabels as its widgets
         self.scroll_area = QScrollArea()
@@ -158,6 +177,7 @@ class MainWin(QWidget):
         info_layout.addWidget(self.stop_signal)
         info_layout.addWidget(self.success)
         info_layout.addWidget(self.finished)
+        info_layout.addWidget(self.error_message)
         info_widget.setLayout(info_layout)
 
         # create bottom layout for the scroll area and our names
@@ -197,43 +217,43 @@ class MainWin(QWidget):
         self.no_result_arxiv.setText(message)
         # resize scroll area to fit message content
         self.scroll_area.updateGeometry()
-        self.scroll_area.verticalScrollBar().setValue(self.scroll_area.verticalScrollBar().minimum())
+        self.scroll_area.verticalScrollBar().setValue(self.scroll_area.verticalScrollBar().maximum())
 
     def handle_no_result_pubmed(self, message):
         self.no_result_pubmed.setText(message)
         # resize scroll area to fit message content
         self.scroll_area.updateGeometry()
-        self.scroll_area.verticalScrollBar().setValue(self.scroll_area.verticalScrollBar().minimum())
+        self.scroll_area.verticalScrollBar().setValue(self.scroll_area.verticalScrollBar().maximum())
 
     def handle_no_result_ieee(self, message):
         self.no_result_ieee.setText(message)
         # resize scroll area to fit message content
         self.scroll_area.updateGeometry()
-        self.scroll_area.verticalScrollBar().setValue(self.scroll_area.verticalScrollBar().minimum())
+        self.scroll_area.verticalScrollBar().setValue(self.scroll_area.verticalScrollBar().maximum())
 
     def handle_error_arxiv(self, message):
         self.error_arxiv.setText(message)
         # resize scroll area to fit message content
         self.scroll_area.updateGeometry()
-        self.scroll_area.verticalScrollBar().setValue(self.scroll_area.verticalScrollBar().minimum())
+        self.scroll_area.verticalScrollBar().setValue(self.scroll_area.verticalScrollBar().maximum())
 
     def handle_error_ieee(self, message):
         self.error_ieee.setText(message)
         # resize scroll area to fit message content
         self.scroll_area.updateGeometry()
-        self.scroll_area.verticalScrollBar().setValue(self.scroll_area.verticalScrollBar().minimum())
+        self.scroll_area.verticalScrollBar().setValue(self.scroll_area.verticalScrollBar().maximum())
 
     def handle_error_pubmed(self, message):
         self.error_pubmed.setText(message)
         # resize scroll area to fit message content
         self.scroll_area.updateGeometry()
-        self.scroll_area.verticalScrollBar().setValue(self.scroll_area.verticalScrollBar().minimum())
+        self.scroll_area.verticalScrollBar().setValue(self.scroll_area.verticalScrollBar().maximum())
 
     def handle_general_error(self, message):
         self.general_error.setText(message)
         # resize scroll area to fit message content
         self.scroll_area.updateGeometry()
-        self.scroll_area.verticalScrollBar().setValue(self.scroll_area.verticalScrollBar().minimum())
+        self.scroll_area.verticalScrollBar().setValue(self.scroll_area.verticalScrollBar().maximum())
 
     def handle_success(self, message):
         self.success.setText(message)
@@ -243,6 +263,12 @@ class MainWin(QWidget):
 
     def handle_finished(self, message):
         self.finished.setText(message)
+        # resize scroll area to fit message content
+        self.scroll_area.updateGeometry()
+        self.scroll_area.verticalScrollBar().setValue(self.scroll_area.verticalScrollBar().maximum())
+
+    def handle_error_message(self, message):
+        self.error_message.setText(message)
         # resize scroll area to fit message content
         self.scroll_area.updateGeometry()
         self.scroll_area.verticalScrollBar().setValue(self.scroll_area.verticalScrollBar().maximum())
@@ -284,6 +310,25 @@ class MainWin(QWidget):
         self.scroll_area.verticalScrollBar().setValue(0)
 
     def handle_submit(self):
+        """
+        Method that handles the user's search queries
+
+        If the first search has not been performed yet, as set by the `self.first_search_performed` flag, we will
+        establish a connection to the search query queue via
+        `self.send_message.connect(self.worker.receive_search_data)` and pass the first search query to the queue
+
+        We decided to let the user to keep giving search queries to be added to the initial CSV choice (new CSV
+        or append). This was done so that the user can perform as many searches as they want in their file, different
+        search terms, different max results, and different sources - should they wish to. It seemed the most user
+        friendly option to us. So, if the first search is performed, we disable the CSV checkbox, change the search
+        button to "Next Search", clear the search term bar, display the first search, and
+        set self.first_search_performed to True so that the `else` statement will be activated for each next search.
+
+        For each following search we will display the search term on the UI and clear appropriate checkboxes and
+        input fields. Appropriate user query info will subsequently be logged to the log file, the data will be send
+        to the search queue, and the UI will be updated accordingly.
+        :return:
+        """
 
         if not self.first_search_performed:
 
@@ -304,18 +349,23 @@ class MainWin(QWidget):
             logger.info("NEW CSV: %s", new_csv, extra={"agent": "INFO"})
             logger.info("NUMBER OF DESIRED SEARCH RESULTS: %s", num_results, extra={"agent": "INFO"})
 
+            # now instantiate the worker
             self.worker = Worker(new_csv, num_results, arxiv, pubmed, ieee)
+            # set up message connection for search complete
             self.worker.search_complete.connect(widget.handle_search_complete)
+            # set up message connection for any errors caught in the run() method
+            self.worker.run_error_messsage.connect(widget.handle_error_occured)
+            # start the worker
             self.worker.start()
 
+            # set up connection with the worker to pass user search queries to the search queues
             self.send_message.connect(self.worker.receive_search_data)
 
-            # send first search through
+            # send first search through to search queue
             data = (search_term, num_results, arxiv, pubmed, ieee)
             self.send_message.emit(data)
 
-            # disable the submit button and csv checkbox
-            # self.submit_button.setEnabled(False)
+            # disable the csv checkbox
             self.new_csv_checkbox.setEnabled(False)
 
             # set button to "Next Search" after first search
@@ -330,7 +380,7 @@ class MainWin(QWidget):
             # show search terms on UI
             self.search_term_update.setText(f"Searching for {search_term}...")
 
-            #
+            # set first search performed flag to True
             self.first_search_performed = True
 
         else:
@@ -355,9 +405,19 @@ class MainWin(QWidget):
             # Clear the QLineEdit
             self.search_term.clear()
 
+            # send search through to search queue
             self.send_message.emit(data)
 
     def handle_stop_button(self):
+        """
+        This button is here for the user to indicate that the search is over. The button was put in place because
+        otherwise the system will not know when to finalise the export (since the agents are always listening to new
+        responses until a None sentinel is signalled)
+
+        This method also signals the end to the `search_button_queue` in the worker thread, which will subsequently
+        tell the SearchAgent the same so that the agents can round off their work and finish.
+        :return:
+        """
         # put None into the queue to stop the worker thread
         self.worker.search_button_queue.put(None)
         # set submit button back to search and grey out until the search is done
@@ -369,13 +429,24 @@ class MainWin(QWidget):
         self.scroll_area.verticalScrollBar().setValue(self.scroll_area.verticalScrollBar().maximum())
 
     def handle_search_complete(self, csv_file_path):
+        """
+        Since the Agent threads have been put in a separate UI Worker QThread to allow responsiveness in the UI,
+        this function allows the `csv_file_path` to be communicated back to the UI so that we can present it to
+        the user. It also ensures the Worker instance (self.worker) is fully shut down to avoid any issues with
+        restarting the worker once the user is ready for a new search (with New CSV yes/no option). This method
+        resets all the interface widgets as if the program has just been started for the first time.
 
+        :param csv_file_path:
+        :return:
+        """
+        # shut down Worker instance
         if self.worker is not None:
             self.worker.quit()
             self.worker.wait()
             self.worker.deleteLater()
             self.worker = None
 
+        # notify user
         self.handle_finished("Search complete, CSV has been opened in default .csv extension application. "
                              f"<br>The file path is: {csv_file_path}")
 
@@ -395,9 +466,65 @@ class MainWin(QWidget):
         # scroll to bottom of scroll area
         self.scroll_area.verticalScrollBar().setValue(self.scroll_area.verticalScrollBar().maximum())
 
+    def handle_error_occured(self, worker_error_message):
+        """
+        This method handles any errors that could occur in the try-except blocks of the run() method in
+        the Worker class. The user needs to be notified of this, this method ensures that error will be
+        displayed on the UI.
+
+        It further performs all the same actions as the `handle_search_complete` above.
+
+        :param worker_error_message: tuple of string message and error exception to be displayed on the UI
+        :return:
+        """
+        # shut down Worker instance
+        if self.worker is not None:
+            self.worker.quit()
+            self.worker.wait()
+            self.worker.deleteLater()
+            self.worker = None
+
+        error_message, error_caught = worker_error_message
+
+        # notify user
+        self.handle_error_message(f"{error_message} {error_caught}")
+
+        # enable submit button and csv checkbox again
+        self.submit_button.setEnabled(True)
+        self.new_csv_checkbox.setEnabled(True)
+
+        # reset first search performed
+        self.first_search_performed = False
+
+        # set submit button back to 'Search'
+        self.submit_button.setText("Search")
+
+        # and disable stop button
+        self.stop_button.setEnabled(False)
+
+        # scroll to bottom of scroll area
+        self.scroll_area.verticalScrollBar().setValue(self.scroll_area.verticalScrollBar().maximum())
+
 
 class Worker(QThread):
+    """
+    The agent instantiations and instantiations of respective worker threads were causing issues with the
+    responsiveness of the UI while the agents were working. We therefore decided to put this functionality
+    on a separate PyQt5 QThread, to create a Worker class. This ensures the UI remains responsive, and through
+    signal communication and message queues we can communicate with the different components of the system.
+
+    At first the plan was to just run the code in the `run()` method off the `MainWin()` class, however there was
+    no way for the user to signal stop to the program. This stop button was required firstly to ensure the user
+    has a way to stop the search in case of any unhandled errors, but secondly to allow the user to cancel a search
+    without terminating the whole program, and losing all data. It was therefore decided to put this functionality
+    on a separate thread as described above.
+
+    This allowed us to change the system in such a way that there was "true continuous agent listening". Now we were
+    able to leave the search queue always open to allow the user to perform as many searches as they want.
+    always listening for new queries from the user, until signalled to finish.
+    """
     search_complete = pyqtSignal(str)
+    run_error_messsage = pyqtSignal(tuple)
 
     def __init__(self, new_csv, num_results, arxiv=False, pubmed=False, ieee=False):
         super().__init__()
@@ -432,6 +559,7 @@ class Worker(QThread):
         csv_dir = os.path.join(user_data_dir, "csv-exports")
         os.makedirs(csv_dir, exist_ok=True)
 
+        # if user signifies new CSV
         if self.new_csv:
             # find highest counter number for existing file names
             counter = 0
@@ -446,17 +574,17 @@ class Worker(QThread):
                               file.startswith(file_name) and file.endswith(".csv")]
 
             if existing_files:
-
                 # use regex to find files matching our file_name pattern
                 existing_files = [file for file in os.listdir(csv_dir) if re.match(rf"{file_name}-\d+\.csv$", file)]
                 # extract counters
                 existing_counters = [int(re.search(rf"{file_name}-(\d+)\.csv$", file).group(1)) for file in
                                      existing_files]
-                # find highest counter
+                # find highest counter and set that as `file_name` to append to
                 highest_counter = max(existing_counters) if existing_counters else 0
                 file_name = f"{file_name}-{highest_counter}"
 
             else:
+                # no existing files, new file will be created
                 # base name if no file exists
                 counter = 0
                 file_name = f"{file_name}-{counter}"
@@ -465,6 +593,7 @@ class Worker(QThread):
         location = os.path.join(user_data_dir, "csv-exports", f"{file_name}.csv")
 
         try:
+            # rest of code below...
             search_thread = threading.Thread(target=search_agent.search,
                                              args=(search_in_queue, processing_queue,))
             search_thread.start()
@@ -486,6 +615,7 @@ class Worker(QThread):
                 # Add the search term to the input queue
                 search_in_queue.put(data)
 
+                # sentinel received from `handle_stop_button` method, signal finish
                 if data is None:
                     break
 
@@ -496,38 +626,45 @@ class Worker(QThread):
 
             # open .csv with default file extension app, check for existence
 
-            # on windows
-            if platform.system() == 'Windows':
-                if os.path.exists(location):
-                    os.system(f'start excel.exe "{location}"')
-                else:
-                    logger.error(f"File {location} does not exist.", extra={"agent": "ERROR"})
+            # catch any error that might occur by opening the file
+            try:
 
-            # on macOS
-            elif platform.system() == 'Darwin':
-                if os.path.exists(location):
-                    os.system(f'open "{location}"')
-                else:
-                    logger.error(f"File {location} does not exist.", extra={"agent": "ERROR"})
+                # on windows
+                if platform.system() == 'Windows':
+                    if os.path.exists(location):
+                        os.system(f'start excel.exe "{location}"')
+                    else:
+                        logger.error(f"File {location} does not exist.", extra={"agent": "ERROR"})
 
-            # linux (linux doesn't run MS Excel)
-            elif platform.system() == 'Linux':
-                if os.path.exists(location):
-                    os.system(f'xdg-open "{location}"')
-                else:
-                    logger.error(f"File {location} does not exist.", extra={"agent": "ERROR"})
+                # on macOS
+                elif platform.system() == 'Darwin':
+                    if os.path.exists(location):
+                        os.system(f'open "{location}"')
+                    else:
+                        logger.error(f"File {location} does not exist.", extra={"agent": "ERROR"})
+
+                # linux (linux doesn't run MS Excel)
+                elif platform.system() == 'Linux':
+                    if os.path.exists(location):
+                        os.system(f'xdg-open "{location}"')
+                    else:
+                        logger.error(f"File {location} does not exist.", extra={"agent": "ERROR"})
+
+            except Exception as e:
+                self.run_error_messsage.emit((str("ERROR: unable to open file: "), str(e)))
+                logger.error(f"An error occurred, unable to open file: {str(e)}", extra={"agent": "ERROR"})
 
             self.search_complete.emit(location)
 
         except Exception as e:
-            # todo: add UI message for this
+            self.run_error_messsage.emit((str("An error occured: "), str(e)))
             logger.error(f"An error occurred: {str(e)}", extra={"agent": "ERROR"})
 
 
 if __name__ == "__main__":
-    app = QApplication(sys.argv)
+    app = QApplication(sys.argv)    # QApplication instance to manage the app
 
-    widget = MainWin()
-    widget.show()
+    widget = MainWin()  # instance of our MainWin() class
+    widget.show()   # display the MainWin() instance
 
-    sys.exit(app.exec_())
+    sys.exit(app.exec_())   # handle app exit
