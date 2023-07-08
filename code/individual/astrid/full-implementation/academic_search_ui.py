@@ -9,7 +9,7 @@ import os
 import re
 # import `platform` to determine the operating system
 import platform
-# import `sys` to perform system operations such as opening and closing applications
+# import `sys` to perform system operations such asx opening and closing applications
 import sys
 # import `appdirs` to set a base directory for export location
 import appdirs
@@ -28,11 +28,14 @@ win_width, win_height = 750, 700
 class MainWin(QWidget):
     """
     UI main window
+    """
 
-    first set up message signal to signify user search query from the `handle_submit` method to the `SearchAgent`
-    message is connected to the `worker` `receive_search_data` @pyqtSlot
-    messages are put from the `search_button_queue` into the `search_in_queue` which is passed as an argument to
-    the `SearchAgent` instance which runs on a thread
+    """
+    create a `pyqtSignal` instance to signal the user search query via the `handle_submit` method to the `SearchAgent`.
+    This message is connected to the `receive_search_data` @pyqtSlot in the Worker class. This allows for communication
+    between the main UI window and the Worker thread that handles the agents. This way the search query can be passed
+    to the SearchAgent. Messages are first put in a local `search_button_queue`, before being passed on to the 
+    `search_in_queue` which is passed as an argument to the `SearchAgent` instance running on a thread in the Worker.
     """
     send_message = pyqtSignal(tuple)
 
