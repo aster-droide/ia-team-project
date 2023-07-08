@@ -709,7 +709,7 @@ class DataExportAgent:
     """
     `DataExportAgent` with a single method to export the data in an appropriate format
     data is received from the processing agent by listening to constant messages
-    CSV format was chosen since it is an good format to work with in Python for further processing and
+    CSV format was chosen since it is a good format to work with in Python for further processing and
     because it allows the user to easily view the data in their default application associated with .csv
     """
 
