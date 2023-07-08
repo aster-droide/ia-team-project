@@ -320,7 +320,9 @@ class MainWin(QWidget):
         We decided to let the user to keep giving search queries to be added to the initial CSV choice (new CSV
         or append). This was done so that the user can perform as many searches as they want in their file, different
         search terms, different max results, and different sources - should they wish to. It seemed the most user
-        friendly option to us. So, if the first search is performed, we disable the CSV checkbox, change the search
+        friendly option to us. We also felt that it demonstrated the agent autonmomy better because the agents would 
+        continue polling the queues until told to stop, rather than stopping after the search is complete. 
+        So, if the first search is performed, we disable the CSV checkbox, change the search
         button to "Next Search", clear the search term bar, display the first search, and
         set self.first_search_performed to True so that the `else` statement will be activated for each next search.
 
@@ -411,7 +413,7 @@ class MainWin(QWidget):
     def handle_stop_button(self):
         """
         This button is here for the user to indicate that the search is over. The button was put in place because
-        otherwise the system will not know when to finalise the export (since the agents are always listening to new
+        otherwise the system will not know when to finalise the export (since the agents are always listening for new
         responses until a None sentinel is signalled)
 
         This method also signals the end to the `search_button_queue` in the worker thread, which will subsequently
@@ -469,10 +471,10 @@ class MainWin(QWidget):
     def handle_error_occured(self, worker_error_message):
         """
         This method handles any errors that could occur in the try-except blocks of the run() method in
-        the Worker class. The user needs to be notified of this, this method ensures that error will be
-        displayed on the UI.
+        the Worker class. The user needs to be notified of this, so this method ensures that the error 
+        will be displayed on the UI.
 
-        It further performs all the same actions as the `handle_search_complete` above.
+        It further performs all of the same actions as the `handle_search_complete` above.
 
         :param worker_error_message: tuple of string message and error exception to be displayed on the UI
         :return:
@@ -514,14 +516,14 @@ class Worker(QThread):
     signal communication and message queues we can communicate with the different components of the system.
 
     At first the plan was to just run the code in the `run()` method off the `MainWin()` class, however there was
-    no way for the user to signal stop to the program. This stop button was required firstly to ensure the user
+    no way for the user to signal stop to the program. The stop button was required firstly to ensure the user
     has a way to stop the search in case of any unhandled errors, but secondly to allow the user to cancel a search
     without terminating the whole program, and losing all data. It was therefore decided to put this functionality
     on a separate thread as described above.
 
     This allowed us to change the system in such a way that there was "true continuous agent listening". Now we were
-    able to leave the search queue always open to allow the user to perform as many searches as they want.
-    always listening for new queries from the user, until signalled to finish.
+    able to leave the search queue always open to allow the user to perform as many searches as they want, with the 
+    agents always listening for new queries from the user, until signalled to finish.
     """
     search_complete = pyqtSignal(str)
     run_error_messsage = pyqtSignal(tuple)
