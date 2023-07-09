@@ -515,7 +515,8 @@ class Worker(QThread):
     """
     The agent instantiations and instantiations of respective worker threads were causing issues with the
     responsiveness of the UI while the agents were working. We therefore decided to put this functionality
-    on a separate PyQt5 QThread, to create a Worker class. This ensures the UI remains responsive, and through
+    on a separate PyQt5 QThread (with the help of this guide: https://realpython.com/python-pyqt-qthread/),
+    to create a Worker class. This ensures the UI remains responsive, and through
     signal communication and message queues we can communicate with the different components of the system.
 
     At first the plan was to just run the code in the `run()` method off the `MainWin()` class, however there was
@@ -597,8 +598,33 @@ class Worker(QThread):
         # construct file path
         location = os.path.join(user_data_dir, "csv-exports", f"{file_name}.csv")
 
+        """
+        Since the project consists of search, process, export, it was decided to create three separate agents 
+        for this functionality. 
+        
+        We are placing each individual agent on a separate thread to allow for asynchronous processing. 
+        The Search Agent always listens for search queries from the user, the Processing Agent always listens 
+        for search results from the Search Agent, and the Export Agent always listens to processed results 
+        from the Processing Agent. Thanks due threading these 3 agents can search, process, and export, regardless 
+        of what the other agents are doing. 
+
+        When exploring which library to use for this we had three options, multiprocessing, threading, 
+        and asyncio (https://stackoverflow.com/questions/27435284/multiprocessing-vs-multithreading-vs-asyncio). 
+        
+        From experience, and from the above forum, we know that asyncio is a powerful tool where the 
+        developer has (and is required to) have a lot of power over the asynchronous implementation of 
+        an application. It seemed that python's `threading` library was a straightforward, relatively simple 
+        solution to our problem. Since our program is a combination of I/O-bound (such as network requests) 
+        and CPU-bound (such as parsing and modifying data), and the fact that the `multiprocessing` library 
+        seemed to have similar application methods to threading, we explored both threading and multiprocessing. 
+        It was found that when running the code directly (without UI), multiprocessing outperformed threading 
+        slightly (at the time the program ran smoother and faster with multiprocessing). 
+        However on the UI, because multiprocessing runs CPU in parallel (completely separate memory spaces) 
+        we lost the message communication from the backend to the UI code. This could have been fixed my using 
+        methods such as pipes and sockets for communication, but this seemed overkill considering threading 
+        (as threads on a shared memory space) worked pretty much straight out of the box. 
+        """
         try:
-            # rest of code below...
             search_thread = threading.Thread(target=search_agent.search,
                                              args=(search_in_queue, processing_queue,))
             search_thread.start()

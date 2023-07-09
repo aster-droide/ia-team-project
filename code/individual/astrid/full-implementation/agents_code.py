@@ -34,11 +34,34 @@ class AgentSignals(QObject):
 # create signal instance to communicate with the UI
 agent_signals = AgentSignals()
 
+"""
+For both the search agent and the processing agent, document repository have individual methods for searching / 
+processing. This is for a few reasons:
+
+- the user can select any or all repositories for search results, when we know for sure that the user does not 
+    want a certain repository, it is a waste of computational power to check the code as we can call separate 
+    methods directly. 
+- this allows for future improvements, with the current setup it is simple and straightforward to add more document 
+    repository API calls should we wish to do so. 
+- each document repository response requires different search url/params and processing so it makes sense to 
+    have separate methods.
+- The Zen of Python: 
+    "There should be one-- and preferably only one --obvious way to do it" 
+    and 
+    "Simple is better than complex"
+"""
+
 
 class SearchAgent:
     """
     `SearchAgent` class to set up individual search call methods
     and a general `search` method acting as our 'listener'
+
+    Currently, searches are performed in sequence - and not parallel. The search agent picks up entries from
+    the message queue one by one and performs the search to the relevant repository. Considering the network
+    requests are  very quick at the current scale, it seemed unnecessary to put these methods on separate threads
+    for parallel processing. However, if we were to scale in the future this can be improved with asynchronous
+    solutions.
     """
 
     @staticmethod
