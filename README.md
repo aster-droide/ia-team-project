@@ -1,12 +1,12 @@
-`data` directory contains the project's data files
+REFERENCES
 
-`code` directory is divided into `individual` (for individual contributions) and `common` (for shared code)
+Tutorials and forum discussions
+https://realpython.com/python-pyqt-qthread/
+https://stackoverflow.com/questions/3044580/multiprocessing-vs-threading-python
+https://www.pythontutorial.net/python-concurrency/python-threading/
+https://stackoverflow.com/questions/27435284/multiprocessing-vs-multithreading-vs-asyncio 
 
-`notebooks` directory contains any project-related notebooks, also divided into `individual` and `common`
-
-`docs` directory holds project documentation
-
-
-Please create a branch off the `master` branch when working on the project
-
-Once changes are committed to your branch, create a pull request for review into `master`
+Key library documentations
+https://docs.python.org/3/library/multiprocessing.html
+https://docs.python.org/3/library/threading.html
+https://pypi.org/project/PyQt5/
