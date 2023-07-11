@@ -25,13 +25,17 @@ to retrieve research articles and relevant information for a given search term.
 
 ## Installation
 
-In [this folder](code/individual/astrid/full-implementation/build_zips) two zip files are provided with a compiled version 
-of the application for Mac and Windows*. These applications include all dependencies and can be run directly on respective platforms.
+In [this folder](build_zips) two zip files are provided with a compiled version 
+of the application for Mac* and Windows**. These applications include all dependencies and can be run directly on respective platforms.
 
 Alternatively, the application can be launched directly by running the
-[academic_search_ui.py](code/individual/astrid/full-implementation/academic_search_ui.py) file.
+[academic_search_ui.py](academic_search_tool/academic_search_ui.py) file. To run locally, 
+please ensure [all three Python](academic_search_tool) files are downloaded and in the same directory. 
 
-*application should run on Linux also but this has not yet been tested. 
+
+*macOS executable compiled on Mac M1, it is not guaranteed it will run as expected on intel devices
+
+**no pre-compiled launcher is available for Linux, application can be run directly on Linux but this has not yet been tested.
 
 
 ## Usage
