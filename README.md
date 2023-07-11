@@ -33,7 +33,7 @@ Alternatively, the application can be launched directly by running the
 please ensure [all three Python](academic_search_tool) files are downloaded and in the same directory. 
 
 
-*unix executable compiled and tested on Mac M1, it is not guaranteed it will run as expected on intel devices or Linux. In case of failure the code can be run directly, while this has been thoroughly tested on the Mac M1 and Windows, it is not guaranteed it will work on Linux. 
+*Unix executable compiled and tested on Mac M1, it is not guaranteed it will run as expected on intel devices or Linux. In case of failure the code can be run directly. While this has been thoroughly tested on the Mac M1 and Windows, it is not guaranteed it will work on Linux. 
 
 
 ## Usage
