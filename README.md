@@ -38,7 +38,7 @@ please ensure [all three Python](academic_search_tool) files are downloaded and 
 
 ## Usage
 
-![UI Screenshot](https://github.com/aster-droide/ia-team-project/blob/f3208d646e0a320ff243677a116336c5f72a21fb/data/Screenshot%202023-07-11%20at%2021.18.54.png)
+![UI Screenshot](https://github.com/aster-droide/ia-team-project/blob/6c0ed4a09e7e731eda0243a6dbb64c81bd6cafa3/screenshots/Screenshot%202023-07-11%20at%2021.18.54.png)
 
 
 ## Acknowledgments
