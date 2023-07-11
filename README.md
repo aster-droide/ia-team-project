@@ -25,17 +25,17 @@ to retrieve research articles and relevant information for a given search term.
 
 ## Installation
 
-In ![this folder](code/individual/astrid/full-implementation/build_zips) two zip files are provided with a compiled version 
+In [this folder](code/individual/astrid/full-implementation/build_zips) two zip files are provided with a compiled version 
 of the application for Mac and Windows. These applications include all dependencies and can be run directly on respective platforms.
 
 Alternatively, the application can be launched directly by running the
-![academic_search_ui.py](code/individual/astrid/full-implementation/academic_search_ui.py) file.
+[academic_search_ui.py](code/individual/astrid/full-implementation/academic_search_ui.py) file.
 
 
 
 ## Usage
 
-![UI Screenshot](data/Screenshot 2023-07-11 at 21.18.54.png)
+![UI Screenshot](https://github.com/aster-droide/ia-team-project/blob/f3208d646e0a320ff243677a116336c5f72a21fb/data/Screenshot%202023-07-11%20at%2021.18.54.png)
 
 
 ## Acknowledgments
