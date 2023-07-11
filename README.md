@@ -31,7 +31,7 @@ of the application for Mac and Windows*. These applications include all dependen
 Alternatively, the application can be launched directly by running the
 [academic_search_ui.py](code/individual/astrid/full-implementation/academic_search_ui.py) file.
 
-* application should run on Linux also but this has not yet been tested. 
+*application should run on Linux also but this has not yet been tested. 
 
 
 ## Usage
