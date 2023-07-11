@@ -13,14 +13,14 @@ to retrieve research articles and relevant information for a given search term.
 - Customisable search options, users can: 
 - - select the desired search engines 
 - - set max number of results to retrieve 
-- - retrieve results for unlimited search terms in one CSV export.
+- - retrieve results for unlimited search terms in one CSV export
 - - choose a new file or append to existing file
 
 
 - Data is exported to .csv format for easy access to further analysis.
 
 
-- User-friendly graphical user interface (GUI) that is intuitive and easy to use
+- User-friendly graphical user interface (GUI) that is intuitive and easy to use.
 
 
 ## Installation
