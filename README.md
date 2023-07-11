@@ -26,16 +26,14 @@ to retrieve research articles and relevant information for a given search term.
 ## Installation
 
 In [this folder](build_zips) two zip files are provided with a compiled version 
-of the application for Mac* and Windows**. These applications include all dependencies and can be run directly on respective platforms.
+of the application for Mac* and Windows. These applications include all dependencies and can be run directly on respective platforms.
 
 Alternatively, the application can be launched directly by running the
 [academic_search_ui.py](academic_search_tool/academic_search_ui.py) file. To run locally, 
 please ensure [all three Python](academic_search_tool) files are downloaded and in the same directory. 
 
 
-*macOS executable compiled on Mac M1, it is not guaranteed it will run as expected on intel devices
-
-**no pre-compiled launcher is available for Linux, application can be run directly on Linux but this has not yet been tested.
+*unix executable compiled and tested on Mac M1, it is not guaranteed it will run as expected on intel devices or Linux. In case of failure the code can be run directly, while this has been thoroughly tested on the Mac M1 and Windows, it is not guaranteed it will work on Linux. 
 
 
 ## Usage
