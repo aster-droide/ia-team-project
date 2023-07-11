@@ -26,11 +26,12 @@ to retrieve research articles and relevant information for a given search term.
 ## Installation
 
 In [this folder](code/individual/astrid/full-implementation/build_zips) two zip files are provided with a compiled version 
-of the application for Mac and Windows. These applications include all dependencies and can be run directly on respective platforms.
+of the application for Mac and Windows*. These applications include all dependencies and can be run directly on respective platforms.
 
 Alternatively, the application can be launched directly by running the
 [academic_search_ui.py](code/individual/astrid/full-implementation/academic_search_ui.py) file.
 
+* application should run on Linux also but this has not yet been tested. 
 
 
 ## Usage
