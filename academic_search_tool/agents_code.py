@@ -361,6 +361,10 @@ class DataProcessingAgent:
             logger.error(f"Failed to parse XML data: {e}", extra={"agent": "PROCESSING AGENT"})
             return 'arXiv', 'unexpected response'
 
+        # uncommented for response debugging
+        # import json
+        # print(json.dumps(dict_data, indent=4))
+
         # uncomment to activate response log pre-processed
         # logger.info(dict_data, extra={"agent": "PROCESSING AGENT"})
 
@@ -465,6 +469,9 @@ class DataProcessingAgent:
             # uncomment to activate response log pre-processed
             # logger.info(dict_data, extra={"agent": "PROCESSING AGENT"})
 
+            # uncomment to activate response log pre-processed
+            # logger.info(dict_data, extra={"agent": "PROCESSING AGENT"})
+
             # perform processing
             if dict_data:
                 try:
@@ -484,6 +491,10 @@ class DataProcessingAgent:
                 # log message
                 logger.warning("Empty response from pubmed", extra={"agent": "PROCESSING AGENT"})
                 return 'PubMed', 'unexpected response'
+
+            # uncommented for response debugging
+            # import json
+            # print(json.dumps(dict_data, indent=4))
 
             # single entry is returned as dict, convert to list
             if not isinstance(entries, list):
@@ -575,6 +586,10 @@ class DataProcessingAgent:
             # log message
             logger.error(f"Failed to parse XML data: {e}", extra={"agent": "PROCESSING AGENT"})
             return 'IEEE Xplore', 'unexpected response'
+
+        # uncommented for response debugging
+        # import json
+        # print(json.dumps(dict_data, indent=4))
 
         # uncomment to activate response log pre-processed
         # logger.info(dict_data, extra={"agent": "PROCESSING AGENT"})

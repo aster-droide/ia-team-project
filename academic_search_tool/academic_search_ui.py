@@ -101,10 +101,11 @@ class MainWin(QWidget):
         self.search_term.setMaxLength(255)
         # check if form is valid to enable submit button
         self.search_term.textChanged.connect(self.validate_form)
+        # call `handle_submit` function when 'enter' is pressed
+        self.search_term.returnPressed.connect(self.handle_submit)
 
         # QPushButton for submitting the input
         self.submit_button = QPushButton("Search")
-        # self.submit_button.clicked.connect(self.handle_submit)
         # disable button at initiation
         self.submit_button.setEnabled(False)
 
@@ -220,37 +221,37 @@ class MainWin(QWidget):
         self.no_result_arxiv.setText(message)
         # resize scroll area to fit message content
         self.scroll_area.updateGeometry()
-        self.scroll_area.verticalScrollBar().setValue(self.scroll_area.verticalScrollBar().maximum())
+        self.scroll_area.verticalScrollBar().setValue(self.scroll_area.verticalScrollBar().minimum())
 
     def handle_no_result_pubmed(self, message):
         self.no_result_pubmed.setText(message)
         # resize scroll area to fit message content
         self.scroll_area.updateGeometry()
-        self.scroll_area.verticalScrollBar().setValue(self.scroll_area.verticalScrollBar().maximum())
+        self.scroll_area.verticalScrollBar().setValue(self.scroll_area.verticalScrollBar().minimum())
 
     def handle_no_result_ieee(self, message):
         self.no_result_ieee.setText(message)
         # resize scroll area to fit message content
         self.scroll_area.updateGeometry()
-        self.scroll_area.verticalScrollBar().setValue(self.scroll_area.verticalScrollBar().maximum())
+        self.scroll_area.verticalScrollBar().setValue(self.scroll_area.verticalScrollBar().minimum())
 
     def handle_error_arxiv(self, message):
         self.error_arxiv.setText(message)
         # resize scroll area to fit message content
         self.scroll_area.updateGeometry()
-        self.scroll_area.verticalScrollBar().setValue(self.scroll_area.verticalScrollBar().maximum())
+        self.scroll_area.verticalScrollBar().setValue(self.scroll_area.verticalScrollBar().minimum())
 
     def handle_error_ieee(self, message):
         self.error_ieee.setText(message)
         # resize scroll area to fit message content
         self.scroll_area.updateGeometry()
-        self.scroll_area.verticalScrollBar().setValue(self.scroll_area.verticalScrollBar().maximum())
+        self.scroll_area.verticalScrollBar().setValue(self.scroll_area.verticalScrollBar().minimum())
 
     def handle_error_pubmed(self, message):
         self.error_pubmed.setText(message)
         # resize scroll area to fit message content
         self.scroll_area.updateGeometry()
-        self.scroll_area.verticalScrollBar().setValue(self.scroll_area.verticalScrollBar().maximum())
+        self.scroll_area.verticalScrollBar().setValue(self.scroll_area.verticalScrollBar().minimum())
 
     def handle_general_error(self, message):
         self.general_error.setText(message)
@@ -266,6 +267,8 @@ class MainWin(QWidget):
 
     def handle_finished(self, message):
         self.finished.setText(message)
+        # allow text to be copied (for the filepath)
+        self.finished.setTextInteractionFlags(Qt.TextSelectableByMouse)
         # resize scroll area to fit message content
         self.scroll_area.updateGeometry()
         self.scroll_area.verticalScrollBar().setValue(self.scroll_area.verticalScrollBar().maximum())
@@ -334,7 +337,19 @@ class MainWin(QWidget):
         to the search queue, and the UI will be updated accordingly.
         :return:
         """
+        # check if the form is valid when enter is pressed, else do nothing - this was the simplest implementation
+        # for that functionality. Otherwise could create a full function for pressing enter but not necessary
+        checkboxes_checked = self.checkbox_arxiv.isChecked() or self.\
+            checkbox_pubmed.isChecked() or self.checkbox_ieee.isChecked()
 
+        # check if search term is not empty
+        search_term_valid = bool(self.search_term.text().strip())
+
+        if not (search_term_valid and checkboxes_checked):
+            # just return empty
+            return
+
+        # check if we're in subsequent searches
         if not self.first_search_performed:
 
             # clear info message labels from previous search
