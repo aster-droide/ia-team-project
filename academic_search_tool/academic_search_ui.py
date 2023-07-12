@@ -110,9 +110,7 @@ class MainWin(QWidget):
         self.submit_button.setEnabled(False)
 
         # create 'Search' and 'Finish' buttons and disable them
-        # self.search_button = QPushButton('Search')
         self.stop_button = QPushButton('Finish')
-        # self.search_button.setEnabled(False)
         self.stop_button.setEnabled(False)
         self.submit_button.clicked.connect(self.handle_submit)
         self.stop_button.clicked.connect(self.handle_stop_button)
@@ -134,7 +132,6 @@ class MainWin(QWidget):
         input_layout = QHBoxLayout()
         input_layout.addWidget(self.search_term)
         input_layout.addWidget(self.submit_button)
-        # input_layout.addWidget(self.search_button)
         input_layout.addWidget(self.stop_button)
 
         # QLabels for info messaging as received from the backend
@@ -213,8 +210,7 @@ class MainWin(QWidget):
         agent_signals.success.connect(self.handle_success)
 
     def enable_buttons(self):
-        # enable the 'Search' and 'Finish' buttons when 'Submit' button is clicked
-        # self.search_button.setEnabled(True)
+        # enable the 'Finish' buttons when 'Submit' button is clicked or 'enter' is pressed
         self.stop_button.setEnabled(True)
 
     def handle_no_result_arxiv(self, message):
@@ -352,6 +348,9 @@ class MainWin(QWidget):
         # check if we're in subsequent searches
         if not self.first_search_performed:
 
+            # make sure 'Finish' button is enabled
+            self.stop_button.setEnabled(True)
+
             # clear info message labels from previous search
             self.clear_info_messages()
 
@@ -404,6 +403,9 @@ class MainWin(QWidget):
             self.first_search_performed = True
 
         else:
+            # make sure 'Finish' button is enabled
+            self.stop_button.setEnabled(True)
+
             self.clear_info_messages()
 
             # check which searches are checked
