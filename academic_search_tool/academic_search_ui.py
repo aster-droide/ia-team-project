@@ -322,7 +322,7 @@ class MainWin(QWidget):
         We decided to let the user to keep giving search queries to be added to the initial CSV choice (new CSV
         or append). This was done so that the user can perform as many searches as they want in their file, different
         search terms, different max results, and different sources - should they wish to. It seemed the most user
-        friendly option to us. We also felt that it demonstrated the agent autonmomy better because the agents would 
+        friendly option to us. We also felt that it demonstrated the agent autonomy better because the agents would
         continue polling the queues until told to stop, rather than stopping after the search is complete. 
         So, if the first search is performed, we disable the CSV checkbox, change the search
         button to "Next Search", clear the search term bar, display the first search, and
@@ -622,8 +622,8 @@ class Worker(QThread):
         We are placing each individual agent on a separate thread to allow for asynchronous processing. 
         The Search Agent always listens for search queries from the user, the Processing Agent always listens 
         for search results from the Search Agent, and the Export Agent always listens to processed results 
-        from the Processing Agent. Thanks due threading these 3 agents can search, process, and export, regardless 
-        of what the other agents are doing. 
+        from the Processing Agent. Thanks due threading these three agents can search, process, and export, 
+        regardless of what the other agents are doing. 
 
         When exploring which library to use for this we had three options, multiprocessing, threading, 
         and asyncio (https://stackoverflow.com/questions/27435284/multiprocessing-vs-multithreading-vs-asyncio). 
@@ -642,6 +642,7 @@ class Worker(QThread):
         (as threads on a shared memory space) worked pretty much straight out of the box. 
         """
         try:
+            # Start the search thread
             search_thread = threading.Thread(target=search_agent.search,
                                              args=(search_in_queue, processing_queue,))
             search_thread.start()
@@ -658,9 +659,10 @@ class Worker(QThread):
 
             while True:
 
+                # receive data from UI
                 data = self.search_button_queue.get()
 
-                # Add the search term to the input queue
+                # Add the search term to the search input queue
                 search_in_queue.put(data)
 
                 # sentinel received from `handle_stop_button` method, signal finish
@@ -671,8 +673,6 @@ class Worker(QThread):
             search_thread.join()
             processing_thread.join()
             export_thread.join()
-
-            # open .csv with default file extension app, check for existence
 
             # catch any error that might occur by opening the file
             try:

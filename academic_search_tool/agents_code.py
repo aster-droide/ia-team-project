@@ -95,7 +95,7 @@ class SearchAgent:
             # log message
             logger.info("TRYING ARXIV", extra={"agent": "SEARCH AGENT"})
 
-            # try to make the request
+            # try to make the arXiv request
             try:
                 response = requests.get(url, params=params)
                 # log message
@@ -253,7 +253,7 @@ class SearchAgent:
             # log message
             logger.info("TRYING IEEE XPLORE", extra={"agent": "SEARCH AGENT"})
 
-            # try to make the request
+            # try to make the IEEE Xplore request
             try:
                 # requests url encodes the query params
                 response = requests.get(url, params=params)
@@ -362,8 +362,8 @@ class DataProcessingAgent:
             return 'arXiv', 'unexpected response'
 
         # uncommented for response debugging
-        # import json
-        # print(json.dumps(dict_data, indent=4))
+        import json
+        print(json.dumps(dict_data, indent=4))
 
         # uncomment to activate response log pre-processed
         # logger.info(dict_data, extra={"agent": "PROCESSING AGENT"})
