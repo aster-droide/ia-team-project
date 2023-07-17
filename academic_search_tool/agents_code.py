@@ -362,8 +362,8 @@ class DataProcessingAgent:
             return 'arXiv', 'unexpected response'
 
         # uncommented for response debugging
-        import json
-        print(json.dumps(dict_data, indent=4))
+        # import json
+        # print(json.dumps(dict_data, indent=4))
 
         # uncomment to activate response log pre-processed
         # logger.info(dict_data, extra={"agent": "PROCESSING AGENT"})
