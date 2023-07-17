@@ -473,7 +473,6 @@ class MainWin(QWidget):
                              f"<br>The file path is: {csv_file_path}")
 
         # enable submit button and csv checkbox again
-        self.submit_button.setEnabled(True)
         self.new_csv_checkbox.setEnabled(True)
 
         # reset first search performed
