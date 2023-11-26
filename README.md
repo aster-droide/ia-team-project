@@ -3,7 +3,8 @@
 
 This repository contains an Intelligent Academic Research Tool allowing users to search multiple academic 
 databases simultaneously and export the search results to a CSV file. It provides a simple and convenient way 
-to retrieve research articles and relevant information for a given search term. 
+to retrieve research articles and relevant information for a given search term. Useful for data mining tasks, project  
+has capacity to expand to more specific filtering. 
 
 
 ## Features
